@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "NaiNai Alert",
   description: "家庭用ストック管理とLINE通知のWebアプリ",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+  },
   appleWebApp: {
     capable: true,
     title: "NaiNai Alert",
