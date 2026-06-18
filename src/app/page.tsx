@@ -1526,6 +1526,12 @@ function SettingsView({
             </button>
           </div>
           {!lineFriendUrl ? <p className="meta mt-3">VercelにNEXT_PUBLIC_LINE_FRIEND_URLを設定すると、公式LINEへの導線が有効になります。</p> : null}
+          <div className="mt-4 rounded-[14px] border border-dashed border-[#B9AD98] bg-[#FFF9EC] p-3 text-xs font-bold leading-6 text-[#6F675D]">
+            <p>LINE連携コードは、通知先を登録するためのコードです。</p>
+            <p>自分だけに通知する場合は、公式LINEとのトークに送ってください。</p>
+            <p>家族グループに通知する場合は、公式LINEを入れたグループに送ってください。</p>
+            <p>送信後、そのトークまたはグループが通知先として保存されます。</p>
+          </div>
           <p className="note">残りわずか・在庫切れのみ通知。自分のLINEまたは1グループに集約し無料枠（月約200通）を節約。</p>
         </div>
         <div className="card">
@@ -1544,7 +1550,8 @@ function SettingsView({
             </div>
           </div>
           <div className="mt-[14px]">
-            <label className="block text-left text-[12.5px] font-extrabold leading-relaxed">招待コード</label>
+            <label className="block text-left text-[12.5px] font-extrabold leading-relaxed">LINE連携コード</label>
+            <p className="meta mt-1">このコードを通知したいLINEトークまたはグループに送ると、そこが通知先になります。</p>
             <input className="input mt-[6px] text-left font-[var(--font-outfit)] font-semibold tracking-[.2em]" readOnly value={inviteCode || "未発行"} />
             <button
               type="button"
@@ -1552,7 +1559,7 @@ function SettingsView({
               disabled={!inviteCode}
               className="mt-1 min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold"
             >
-              📋 コードをコピー
+              📋 LINE連携コードをコピー
             </button>
           </div>
           <div className="mt-5 border-t border-[#E7DCC6] pt-4">
