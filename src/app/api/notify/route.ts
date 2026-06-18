@@ -21,6 +21,12 @@ type HouseholdForNotify = {
   line_target_id: string | null;
 };
 
+function buildDedupeKey(itemId: string, status: ItemStatus, windowMin: number) {
+  const windowMs = windowMin * 60 * 1000;
+  const bucket = Math.floor(Date.now() / windowMs);
+  return `${itemId}:${status}:${bucket}`;
+}
+
 function buildMessage(status: ItemStatus, itemName: string, lastPurchaseMemo?: string) {
   const memoLine = lastPurchaseMemo ? `\nいつもの容量：${lastPurchaseMemo}` : "";
 
@@ -88,16 +94,6 @@ export async function POST(request: NextRequest) {
 
   const message = buildMessage(body.status, item.name, item.last_purchase_memo ?? undefined);
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  const writeLog = async (lineStatus: string) => {
-    await admin.from("notifications_log").insert({
-      household_id: item.household_id,
-      item_id: item.id,
-      status: body.status,
-      message,
-      line_status: lineStatus,
-    });
-  };
-
   const dedupeWindowMin = Number(process.env.NOTIFY_DEDUPE_WINDOW_MIN || "10");
   const since = new Date(Date.now() - dedupeWindowMin * 60 * 1000).toISOString();
   const { data: recent } = await admin
@@ -109,12 +105,39 @@ export async function POST(request: NextRequest) {
     .limit(1);
 
   if (recent?.length) {
-    await writeLog("skipped_deduped");
     return NextResponse.json({ ok: true, notified: false, reason: "deduped" });
   }
 
+  const dedupeKey = buildDedupeKey(item.id, body.status, dedupeWindowMin);
+  const { data: reservedLog, error: reserveError } = await admin
+    .from("notifications_log")
+    .insert({
+      household_id: item.household_id,
+      item_id: item.id,
+      status: body.status,
+      message,
+      line_status: "pending",
+      dedupe_key: dedupeKey,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (reserveError) {
+    if (reserveError.code === "23505") {
+      return NextResponse.json({ ok: true, notified: false, reason: "deduped" });
+    }
+
+    console.error("notification reserve failed", reserveError);
+    return NextResponse.json({ ok: false, error: "notification_reserve_failed" }, { status: 500 });
+  }
+
+  const updateLog = async (lineStatus: string) => {
+    if (!reservedLog?.id) return;
+    await admin.from("notifications_log").update({ line_status: lineStatus }).eq("id", reservedLog.id);
+  };
+
   if (!token) {
-    await writeLog("dry_run_no_token");
+    await updateLog("dry_run_no_token");
     return NextResponse.json({
       ok: true,
       notified: false,
@@ -126,7 +149,7 @@ export async function POST(request: NextRequest) {
 
   const quota = await getLineQuota(token);
   if (quota.exceeded) {
-    await writeLog("quota_exceeded");
+    await updateLog("quota_exceeded");
     return NextResponse.json({ ok: true, notified: false, reason: "quota_exceeded", message }, { status: 202 });
   }
 
@@ -149,18 +172,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (res.ok || res.status === 409) {
-      await writeLog(String(res.status));
+      await updateLog(String(res.status));
       return NextResponse.json({ ok: true, notified: true, lineStatus: res.status, message });
     }
 
-    await writeLog(String(res.status));
+    await updateLog(String(res.status));
     return NextResponse.json(
       { ok: true, notified: false, reason: "line_error", lineStatus: res.status, message },
       { status: 202 },
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
-    await writeLog(reason);
+    await updateLog(reason);
     return NextResponse.json({ ok: true, notified: false, reason, message }, { status: 202 });
   } finally {
     clearTimeout(timeout);

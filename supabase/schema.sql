@@ -64,6 +64,7 @@ create table if not exists notifications_log (
   status item_status not null,
   message text not null,
   line_status text,
+  dedupe_key text,
   sent_at timestamptz not null default now()
 );
 
@@ -76,6 +77,7 @@ alter table notifications_log enable row level security;
 
 alter table households add column if not exists created_by uuid references auth.users(id) on delete set null;
 alter table items add column if not exists icon text not null default '🧴';
+alter table notifications_log add column if not exists dedupe_key text;
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on households to authenticated;
@@ -197,3 +199,4 @@ create index if not exists idx_items_household_status on items(household_id, sta
 create index if not exists idx_purchase_logs_item_date on purchase_logs(item_id, purchased_at desc);
 create index if not exists idx_status_logs_item_date on status_change_logs(item_id, changed_at desc);
 create index if not exists idx_notifications_dedupe on notifications_log(item_id, status, sent_at desc);
+create unique index if not exists idx_notifications_dedupe_key on notifications_log(dedupe_key) where dedupe_key is not null;

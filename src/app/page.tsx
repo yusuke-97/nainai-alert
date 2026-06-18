@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
@@ -320,6 +320,7 @@ export default function Home() {
   const [restockId, setRestockId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StockItem | null>(null);
   const [recentNotifications, setRecentNotifications] = useState<Record<string, number>>({});
+  const notificationLocksRef = useRef<Set<string>>(new Set());
   const [form, setForm] = useState({ name: "", category: "調味料" as Category, icon: "🧴", note: "" });
   const [editForm, setEditForm] = useState({ name: "", category: "調味料" as Category, icon: "🧴", note: "" });
   const isLoggedIn = Boolean(authUser);
@@ -804,6 +805,13 @@ export default function Home() {
     const lastSent = recentNotifications[key] ?? 0;
     const deduped = Date.now() - lastSent < 10 * 60 * 1000;
     const shouldTryNotify = (to === "low" || to === "out") && Boolean(lineTargetId) && !deduped;
+    if (shouldTryNotify) {
+      if (notificationLocksRef.current.has(key)) {
+        setToast("LINE通知を送信中です。少し待ってから操作してください");
+        return;
+      }
+      notificationLocksRef.current.add(key);
+    }
     let notified = false;
     let reason = !message
       ? "通知なし"
@@ -818,6 +826,7 @@ export default function Home() {
       .update({ status: to, updated_by: authUser.id, updated_at: new Date().toISOString() })
       .eq("id", itemId);
     if (updateError) {
+      if (shouldTryNotify) notificationLocksRef.current.delete(key);
       setToast(`ステータス更新に失敗しました: ${updateError.message}`);
       return;
     }
@@ -840,6 +849,8 @@ export default function Home() {
           ? "LINEトークン未設定のため通知はdry-runです"
           : `LINE通知に失敗しました${result?.reason ? `: ${result.reason}` : ""}`;
     }
+
+    if (shouldTryNotify) notificationLocksRef.current.delete(key);
 
     await supabase.from("status_change_logs").insert({
       item_id: itemId,
