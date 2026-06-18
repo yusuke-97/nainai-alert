@@ -1,0 +1,103 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap");
+@import "tailwindcss";
+
+:root {
+  --background: #fbf6ec;
+  --foreground: #33312e;
+  --font-outfit: "Outfit", sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", Arial, sans-serif;
+  --font-mono: Consolas, "Courier New", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.input {
+  width: 100%;
+  border: 2px solid #2b2a27;
+  border-radius: 12px;
+  background: #fff;
+  min-height: 46px;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+}
+
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(224, 115, 77, 0.24);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid #2b2a27;
+  border-radius: 999px;
+  background: #e0734d;
+  color: #fff;
+  min-height: 48px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 4px 0 #2b2a27;
+}
+
+.card {
+  border: 2px solid #2b2a27;
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 4px 14px rgba(80, 60, 30, 0.08);
+}
+
+.heading {
+  margin: 2px 0 18px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.meta {
+  font-size: 12px;
+  color: #7a746b;
+  line-height: 1.7;
+}
+
+.tag {
+  display: inline-flex;
+  border: 1.5px solid #e7dcc6;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #7a746b;
+}
+
+.note {
+  border: 1.5px dashed #2b2a27;
+  border-radius: 10px;
+  background: #fff7ec;
+  margin-top: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #7a746b;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "NaiNai Alert",
+  "short_name": "NaiNai",
+  "description": "家庭用ストック管理とLINE通知のWebアプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF6EC",
+  "theme_color": "#E0734D",
+  "icons": [
+    {
+      "src": "/window.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
