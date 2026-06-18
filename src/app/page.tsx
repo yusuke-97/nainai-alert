@@ -6,6 +6,8 @@ import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase, supabaseConfigError } from "@/lib/supabase/client";
 
+const lineFriendUrl = process.env.NEXT_PUBLIC_LINE_FRIEND_URL ?? "";
+
 type Screen = "login" | "setup" | "stock" | "add" | "detail" | "edit" | "history" | "settings";
 type ItemStatus = "in_stock" | "low" | "out" | "discontinued";
 type Category = "調味料" | "日用品" | "飲料" | "その他";
@@ -53,6 +55,7 @@ type ProfileRow = {
 type HouseholdRow = {
   id: string;
   name: string;
+  line_target_type: "user" | "group" | null;
   line_target_id: string | null;
   invite_code: string | null;
 };
@@ -301,6 +304,7 @@ export default function Home() {
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [household, setHousehold] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [lineTargetType, setLineTargetType] = useState<"user" | "group" | null>(null);
   const [lineTargetId, setLineTargetId] = useState<string | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [displayName, setDisplayName] = useState("");
@@ -358,6 +362,7 @@ export default function Home() {
       setHouseholdId(null);
       setHousehold("");
       setInviteCode("");
+      setLineTargetType(null);
       setLineTargetId(null);
       setMembers([]);
       setItems([]);
@@ -369,7 +374,7 @@ export default function Home() {
 
     const { data: householdData, error: householdError } = await supabase
       .from("households")
-      .select("id, name, line_target_id, invite_code")
+      .select("id, name, line_target_type, line_target_id, invite_code")
       .eq("id", profile.household_id)
       .single();
 
@@ -382,6 +387,7 @@ export default function Home() {
     setHouseholdId(householdRow.id);
     setHousehold(householdRow.name);
     setInviteCode(householdRow.invite_code ?? "");
+    setLineTargetType(householdRow.line_target_type);
     setLineTargetId(householdRow.line_target_id);
 
     const [{ data: memberData }, { data: itemData, error: itemError }] = await Promise.all([
@@ -499,6 +505,7 @@ export default function Home() {
         setHouseholdId(null);
         setHousehold("");
         setInviteCode("");
+        setLineTargetType(null);
         setLineTargetId(null);
         setMembers([]);
         setDisplayName("");
@@ -671,7 +678,7 @@ export default function Home() {
     const { data: householdData, error: householdError } = await supabase
       .from("households")
       .insert({ name, created_by: authUser.id })
-      .select("id, name, line_target_id, invite_code")
+      .select("id, name, line_target_type, line_target_id, invite_code")
       .single();
 
     if (householdError) {
@@ -922,11 +929,12 @@ export default function Home() {
   async function setLineConnected(connected: boolean) {
     if (!supabase || !householdId) return;
     if (!connected) {
-      const { error } = await supabase.from("households").update({ line_target_id: null }).eq("id", householdId);
+      const { error } = await supabase.from("households").update({ line_target_type: null, line_target_id: null }).eq("id", householdId);
       if (error) {
         setToast(`LINE連携解除に失敗しました: ${error.message}`);
         return;
       }
+      setLineTargetType(null);
       setLineTargetId(null);
       setToast("");
       return;
@@ -1006,6 +1014,8 @@ export default function Home() {
               displayNameDraft={displayNameDraft}
               setDisplayNameDraft={setDisplayNameDraft}
               lineConnected={lineConnected}
+              lineTargetType={lineTargetType}
+              lineFriendUrl={lineFriendUrl}
               setLineConnected={setLineConnected}
               onSaveDisplayName={saveDisplayName}
               onLogout={logout}
@@ -1443,6 +1453,8 @@ function SettingsView({
   displayNameDraft,
   setDisplayNameDraft,
   lineConnected,
+  lineTargetType,
+  lineFriendUrl,
   setLineConnected,
   onSaveDisplayName,
   onLogout,
@@ -1453,10 +1465,14 @@ function SettingsView({
   displayNameDraft: string;
   setDisplayNameDraft: (displayName: string) => void;
   lineConnected: boolean;
+  lineTargetType: "user" | "group" | null;
+  lineFriendUrl: string;
   setLineConnected: (connected: boolean) => void | Promise<void>;
   onSaveDisplayName: (displayName: string) => void | Promise<void>;
   onLogout: () => void | Promise<void>;
 }) {
+  const lineTargetLabel = lineTargetType === "user" ? "自分のLINE" : `${household} グループ`;
+
   return (
     <section className="w-full max-w-4xl pb-20 md:pb-6">
       <Overline>SETTINGS</Overline>
@@ -1464,11 +1480,40 @@ function SettingsView({
       <div className="grid gap-5 md:grid-cols-2">
         <div className="card">
           <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
-          <p className="meta mt-4">通知先：{lineConnected ? `${household} グループ` : "未設定"}</p>
+          <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
           <button onClick={() => setLineConnected(!lineConnected)} className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]">
             {lineConnected ? "連携しなおす" : "友だち追加 / 連携する"}
           </button>
-          <p className="note">残りわずか・在庫切れのみ通知。1グループに集約し無料枠（月約200通）を節約。</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {lineFriendUrl ? (
+              <a
+                href={lineFriendUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="grid min-h-11 place-items-center rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-center text-sm font-extrabold"
+              >
+                公式LINEを開く
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="min-h-11 rounded-full border-2 border-[#D8CCB7] bg-[#F5EFE2] px-4 py-2 text-sm font-extrabold text-[#9A9183]"
+              >
+                公式LINE URL未設定
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => lineFriendUrl && navigator.clipboard?.writeText(lineFriendUrl)}
+              disabled={!lineFriendUrl}
+              className="min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold disabled:border-[#D8CCB7] disabled:bg-[#F5EFE2] disabled:text-[#9A9183]"
+            >
+              公式LINE URLをコピー
+            </button>
+          </div>
+          {!lineFriendUrl ? <p className="meta mt-3">VercelにNEXT_PUBLIC_LINE_FRIEND_URLを設定すると、公式LINEへの導線が有効になります。</p> : null}
+          <p className="note">残りわずか・在庫切れのみ通知。自分のLINEまたは1グループに集約し無料枠（月約200通）を節約。</p>
         </div>
         <div className="card">
           <div className="flex gap-3"><Thumb>👨‍👩‍👧</Thumb><div><b>家族メンバー</b><p className="meta">{members.length ? `${members.map((member) => member.displayName).join("・")} の${members.length}名` : "メンバー未取得"}</p></div></div>
