@@ -1481,7 +1481,20 @@ function SettingsView({
         <div className="card">
           <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
           <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
-          <button onClick={() => setLineConnected(!lineConnected)} className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]">
+          <button
+            onClick={() => {
+              if (lineConnected) {
+                setLineConnected(false);
+                return;
+              }
+              if (lineFriendUrl) {
+                window.open(lineFriendUrl, "_blank", "noreferrer");
+                return;
+              }
+              setLineConnected(true);
+            }}
+            className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]"
+          >
             {lineConnected ? "連携しなおす" : "友だち追加 / 連携する"}
           </button>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
