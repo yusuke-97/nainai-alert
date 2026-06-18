@@ -8,9 +8,11 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("登録済みのメールアドレスを入力してください。");
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function sendResetEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (sent) return;
     if (!supabase) {
       setMessage(supabaseConfigError || "Supabase環境変数が未設定です");
       return;
@@ -30,7 +32,13 @@ export default function ForgotPasswordPage() {
       }));
     setSending(false);
 
-    setMessage(error ? `送信に失敗しました: ${error.message}` : "パスワード再設定メールを送信しました。メール内のリンクを開いてください。");
+    if (error) {
+      setMessage(`送信に失敗しました: ${error.message}`);
+      return;
+    }
+
+    setSent(true);
+    setMessage("パスワード再設定メールを送信しました。メール内のリンクを開いてください。");
   }
 
   return (
@@ -46,9 +54,10 @@ export default function ForgotPasswordPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
+          disabled={sending || sent}
         />
-        <button disabled={sending} className="btn-primary mt-4 w-full disabled:opacity-50">
-          {sending ? "送信中..." : "再設定メールを送信"} <span className="font-[var(--font-outfit)] text-xs opacity-70">SEND</span>
+        <button disabled={sending || sent} className="btn-primary mt-4 w-full disabled:opacity-50">
+          {sent ? "送信済み" : sending ? "送信中..." : "再設定メールを送信"} <span className="font-[var(--font-outfit)] text-xs opacity-70">SEND</span>
         </button>
         <Link href="/login" className="mt-5 block text-center text-[11px] font-extrabold text-[#C75B38]">
           ログイン画面に戻る →

@@ -10,6 +10,8 @@ function ResetPasswordContent() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("新しいパスワードを入力してください");
   const [ready, setReady] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updated, setUpdated] = useState(false);
 
   useEffect(() => {
     async function prepareSession() {
@@ -47,19 +49,22 @@ function ResetPasswordContent() {
 
   async function updatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !ready) return;
+    if (!supabase || !ready || updating || updated) return;
 
     if (password.length < 6) {
       setMessage("パスワードは6文字以上で入力してください");
       return;
     }
 
+    setUpdating(true);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
+      setUpdating(false);
       setMessage(`パスワード更新に失敗しました: ${error.message}`);
       return;
     }
 
+    setUpdated(true);
     setMessage("パスワードを更新しました");
     router.replace("/");
   }
@@ -77,10 +82,10 @@ function ResetPasswordContent() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="••••••••"
-          disabled={!ready}
+          disabled={!ready || updating || updated}
         />
-        <button disabled={!ready} className="btn-primary mt-4 w-full disabled:opacity-50">
-          更新する <span className="font-[var(--font-outfit)] text-xs opacity-70">UPDATE</span>
+        <button disabled={!ready || updating || updated} className="btn-primary mt-4 w-full disabled:opacity-50">
+          {updated ? "更新済み" : updating ? "更新中..." : "更新する"} <span className="font-[var(--font-outfit)] text-xs opacity-70">UPDATE</span>
         </button>
       </form>
     </main>
