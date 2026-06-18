@@ -642,27 +642,6 @@ export default function Home() {
     setToast(error ? `マジックリンク送信に失敗しました: ${error.message}` : "");
   }
 
-  async function sendPasswordReset(email: string) {
-    if (!supabase) {
-      setToast(supabaseConfigError || "Supabase環境変数が未設定です");
-      return;
-    }
-    if (!email.trim()) {
-      setToast("パスワード再設定用のメールアドレスを入力してください");
-      return;
-    }
-
-    const { error } = await supabase.auth
-      .resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-      .catch((error: unknown) => ({
-        error: error instanceof Error ? error : new Error("パスワード再設定メールの送信に失敗しました"),
-      }));
-
-    setToast(error ? `パスワード再設定メールの送信に失敗しました: ${error.message}` : "パスワード再設定メールを送信しました");
-  }
-
   async function setupHousehold(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !authUser) {
@@ -997,7 +976,7 @@ export default function Home() {
 
         <section className={isLoggedIn && household ? "flex-1 px-4 py-4 pb-20 md:ml-[210px] md:px-[26px] md:py-[22px]" : "grid flex-1 place-items-center"}>
           {authLoading ? <div className="card">読み込み中...</div> : null}
-          {!authLoading && effectiveScreen === "login" && <LoginView onSubmit={login} onSignUp={signUp} onMagicLink={sendMagicLink} onPasswordReset={sendPasswordReset} />}
+          {!authLoading && effectiveScreen === "login" && <LoginView onSubmit={login} onSignUp={signUp} onMagicLink={sendMagicLink} />}
           {effectiveScreen === "setup" && <SetupView onSubmit={setupHousehold} />}
           {effectiveScreen === "stock" && (
             <StockView
@@ -1130,12 +1109,10 @@ function LoginView({
   onSubmit,
   onSignUp,
   onMagicLink,
-  onPasswordReset,
 }: {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSignUp: (email: string, password: string) => void;
   onMagicLink: (email: string) => void;
-  onPasswordReset: (email: string) => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1183,13 +1160,12 @@ function LoginView({
           <Field label="パスワード"><input name="password" className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" /></Field>
           {mode === "login" ? (
             <>
-              <button
-                type="button"
-                onClick={() => onPasswordReset(email)}
+              <a
+                href="/forgot-password"
                 className="mb-3 self-end text-[11px] font-extrabold text-[#7A746B] underline decoration-[#E7DCC6] underline-offset-4"
               >
                 パスワードを忘れた方
-              </button>
+              </a>
               <button className="btn-primary mt-1 w-full">ログイン <span className="font-[var(--font-outfit)] text-xs opacity-70">LOGIN</span></button>
             </>
           ) : (
