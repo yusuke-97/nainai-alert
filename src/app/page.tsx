@@ -22,6 +22,7 @@ type StockItem = {
   note: string;
   lastPurchaseMemo?: string;
   updatedBy: string;
+  updatedByAvatarUrl?: string;
   updatedAt: string;
   purchaseLogs: PurchaseLog[];
 };
@@ -50,6 +51,7 @@ type ProfileRow = {
   household_id: string | null;
   display_name: string | null;
   email: string | null;
+  avatar_url: string | null;
 };
 
 type HouseholdRow = {
@@ -95,6 +97,7 @@ type HouseholdMember = {
   id: string;
   displayName: string;
   email: string;
+  avatarUrl?: string;
 };
 
 const statusConfig: Record<
@@ -309,6 +312,8 @@ export default function Home() {
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [displayName, setDisplayName] = useState("");
   const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profileAvatarDraft, setProfileAvatarDraft] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [toast, setToast] = useState(isSupabaseConfigured ? "" : `${supabaseConfigError}。.env.localを確認してください`);
   const [items, setItems] = useState(initialItems);
@@ -332,7 +337,7 @@ export default function Home() {
     const displayName = user.email?.split("@")[0] || "あなた";
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select("id, household_id, display_name, email")
+      .select("id, household_id, display_name, email, avatar_url")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -346,7 +351,7 @@ export default function Home() {
       const { data: insertedProfile, error: insertError } = await supabase
         .from("profiles")
         .insert({ id: user.id, display_name: displayName, email: user.email ?? null })
-        .select("id, household_id, display_name, email")
+        .select("id, household_id, display_name, email, avatar_url")
         .single();
 
       if (insertError) {
@@ -356,8 +361,11 @@ export default function Home() {
       profile = insertedProfile as ProfileRow;
     }
     const currentDisplayName = profile.display_name || profile.email?.split("@")[0] || "あなた";
+    const currentAvatarUrl = profile.avatar_url || "";
     setDisplayName(currentDisplayName);
     setDisplayNameDraft(currentDisplayName);
+    setProfileAvatarUrl(currentAvatarUrl);
+    setProfileAvatarDraft(currentAvatarUrl);
 
     if (!profile.household_id) {
       setHouseholdId(null);
@@ -392,7 +400,7 @@ export default function Home() {
     setLineTargetId(householdRow.line_target_id);
 
     const [{ data: memberData }, { data: itemData, error: itemError }] = await Promise.all([
-      supabase.from("profiles").select("id, display_name, email").eq("household_id", householdRow.id),
+      supabase.from("profiles").select("id, display_name, email, avatar_url").eq("household_id", householdRow.id),
       supabase
         .from("items")
         .select("id, name, category, icon, status, note, last_purchase_memo, updated_by, updated_at")
@@ -404,15 +412,20 @@ export default function Home() {
       return;
     }
 
-    const members = ((memberData ?? []) as ProfileRow[]).reduce<Record<string, string>>((acc, member) => {
-      acc[member.id] = member.display_name || member.email?.split("@")[0] || "家族";
+    const memberProfiles = (memberData ?? []) as ProfileRow[];
+    const members = memberProfiles.reduce<Record<string, { displayName: string; avatarUrl: string }>>((acc, member) => {
+      acc[member.id] = {
+        displayName: member.display_name || member.email?.split("@")[0] || "家族",
+        avatarUrl: member.avatar_url || "",
+      };
       return acc;
     }, {});
     setMembers(
-      ((memberData ?? []) as ProfileRow[]).map((member) => ({
+      memberProfiles.map((member) => ({
         id: member.id,
         displayName: member.display_name || member.email?.split("@")[0] || "家族",
         email: member.email ?? "",
+        avatarUrl: member.avatar_url || "",
       })),
     );
     const itemRows = (itemData ?? []) as ItemRow[];
@@ -443,7 +456,8 @@ export default function Home() {
       status: item.status,
       note: item.note ?? "",
       lastPurchaseMemo: item.last_purchase_memo ?? undefined,
-      updatedBy: item.updated_by ? members[item.updated_by] || "家族" : "家族",
+      updatedBy: item.updated_by ? members[item.updated_by]?.displayName || "家族" : "家族",
+      updatedByAvatarUrl: item.updated_by ? members[item.updated_by]?.avatarUrl || "" : "",
       updatedAt: formatDateTime(item.updated_at),
       purchaseLogs: purchases
         .filter((purchase) => purchase.item_id === item.id)
@@ -451,7 +465,7 @@ export default function Home() {
           id: purchase.id,
           volume: purchase.volume ?? "",
           memo: purchase.memo ?? "",
-          purchasedBy: purchase.purchased_by ? members[purchase.purchased_by] || "家族" : "家族",
+          purchasedBy: purchase.purchased_by ? members[purchase.purchased_by]?.displayName || "家族" : "家族",
           purchasedAt: formatDate(purchase.purchased_at),
         })),
     }));
@@ -468,7 +482,7 @@ export default function Home() {
         itemName: itemNames[log.item_id] || "削除済みアイテム",
         from: log.from_status ?? log.to_status,
         to: log.to_status,
-        changedBy: log.changed_by ? members[log.changed_by] || "家族" : "家族",
+        changedBy: log.changed_by ? members[log.changed_by]?.displayName || "家族" : "家族",
         changedAt: formatDateTime(log.changed_at),
         notified: log.notified,
         message: log.notified ? "LINE通知済み" : "通知なし",
@@ -511,6 +525,8 @@ export default function Home() {
         setMembers([]);
         setDisplayName("");
         setDisplayNameDraft("");
+        setProfileAvatarUrl("");
+        setProfileAvatarDraft("");
         setItems([]);
         setLogs([]);
         setScreen("login");
@@ -917,7 +933,7 @@ export default function Home() {
     setToast("");
   }
 
-  async function saveDisplayName(nextName: string) {
+  async function saveDisplayName(nextName: string, nextAvatarUrl = profileAvatarDraft) {
     if (!supabase || !authUser) return;
     const trimmed = nextName.trim();
     if (!trimmed) {
@@ -925,7 +941,7 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", authUser.id);
+    const { error } = await supabase.from("profiles").update({ display_name: trimmed, avatar_url: nextAvatarUrl || null }).eq("id", authUser.id);
     if (error) {
       setToast(`表示名の更新に失敗しました: ${error.message}`);
       return;
@@ -933,6 +949,8 @@ export default function Home() {
 
     setDisplayName(trimmed);
     setDisplayNameDraft(trimmed);
+    setProfileAvatarUrl(nextAvatarUrl || "");
+    setProfileAvatarDraft(nextAvatarUrl || "");
     await loadHouseholdData(authUser);
     setToast("");
   }
@@ -959,7 +977,7 @@ export default function Home() {
       <div className={`relative z-10 mx-auto flex min-h-screen w-full flex-col ${isLoggedIn && household ? "md:block" : "px-4 py-4 md:px-6"}`}>
         {isLoggedIn && household ? (
           <div className="hidden md:block">
-            <DesktopShell screen={effectiveScreen} go={requireLogin} household={household} displayName={displayName} />
+            <DesktopShell screen={effectiveScreen} go={requireLogin} household={household} displayName={displayName} avatarUrl={profileAvatarUrl} />
           </div>
         ) : null}
 
@@ -1024,6 +1042,8 @@ export default function Home() {
               members={members}
               displayNameDraft={displayNameDraft}
               setDisplayNameDraft={setDisplayNameDraft}
+              profileAvatarDraft={profileAvatarDraft}
+              setProfileAvatarDraft={setProfileAvatarDraft}
               lineConnected={lineConnected}
               lineTargetType={lineTargetType}
               lineFriendUrl={lineFriendUrl}
@@ -1062,15 +1082,15 @@ function AppHeader({
         <p className="mt-1 text-[11px] font-bold text-[#7A746B]">{household || "家族の在庫を、ひとつの場所で。"}</p>
       </div>
       {isLoggedIn ? (
-        <button onClick={onSettings} className="ml-auto rounded-xl border-2 border-[#2B2A27] bg-white px-3 py-2 text-xs font-extrabold">
-          {lineConnected ? "LINE連携済" : "LINE未連携"}
+        <button onClick={onSettings} className="ml-auto rounded-xl border-2 border-[#2B2A27] bg-white px-3 py-2 font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em]">
+          {lineConnected ? "LINE連携済み" : "LINE未連携"}
         </button>
       ) : null}
     </header>
   );
 }
 
-function DesktopShell({ screen, go, household, displayName }: { screen: Screen; go: (screen: Screen) => void; household: string; displayName: string }) {
+function DesktopShell({ screen, go, household, displayName, avatarUrl }: { screen: Screen; go: (screen: Screen) => void; household: string; displayName: string; avatarUrl: string }) {
   const nav = [
     ["stock", "📋", "在庫一覧"],
     ["add", "➕", "アイテム登録"],
@@ -1098,7 +1118,7 @@ function DesktopShell({ screen, go, household, displayName }: { screen: Screen; 
         ))}
       </nav>
       <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 border-t border-[#E7DCC6] pt-3 text-xs">
-        <span className="grid size-[30px] place-items-center rounded-full bg-[#6E8B4E] text-xs font-extrabold text-white">{(displayName || "あ")[0]}</span>
+        <Avatar name={displayName || "あなた"} avatarUrl={avatarUrl} size="sm" />
         <span><b>{displayName || "あなた"}</b><br /><span className="text-[#7A746B]">{household}</span></span>
       </div>
     </aside>
@@ -1261,7 +1281,13 @@ function ItemCard({ item, onDetail, onStatus }: { item: StockItem; onDetail: (id
         <Thumb>{item.icon}</Thumb>
         <div className="min-w-0 flex-1">
           <h2 className="line-clamp-2 text-[15px] font-extrabold leading-snug">{item.name}</h2>
-          <p className="meta mt-1"><span className="tag">{item.category}</span> {item.lastPurchaseMemo || item.note || "購入メモ未登録"} ・ 更新 {item.updatedBy}</p>
+          <p className="meta mt-1">
+            <span className="tag">{item.category}</span> {item.lastPurchaseMemo || item.note || "購入メモ未登録"} ・ 更新{" "}
+            <span className="inline-flex items-center gap-1 align-middle">
+              <Avatar name={item.updatedBy} avatarUrl={item.updatedByAvatarUrl} size="xs" />
+              {item.updatedBy}
+            </span>
+          </p>
         </div>
         <StatusPill status={item.status} />
       </button>
@@ -1471,6 +1497,8 @@ function SettingsView({
   members,
   displayNameDraft,
   setDisplayNameDraft,
+  profileAvatarDraft,
+  setProfileAvatarDraft,
   lineConnected,
   lineTargetType,
   lineFriendUrl,
@@ -1483,14 +1511,36 @@ function SettingsView({
   members: HouseholdMember[];
   displayNameDraft: string;
   setDisplayNameDraft: (displayName: string) => void;
+  profileAvatarDraft: string;
+  setProfileAvatarDraft: (avatarUrl: string) => void;
   lineConnected: boolean;
   lineTargetType: "user" | "group" | null;
   lineFriendUrl: string;
   setLineConnected: (connected: boolean) => void | Promise<void>;
-  onSaveDisplayName: (displayName: string) => void | Promise<void>;
+  onSaveDisplayName: (displayName: string, avatarUrl?: string) => void | Promise<void>;
   onLogout: () => void | Promise<void>;
 }) {
   const lineTargetLabel = lineTargetType === "user" ? "自分のLINE" : `${household} グループ`;
+
+  function updateAvatar(file: File | null) {
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    const image = document.createElement("img");
+    image.onload = () => {
+      const maxSize = 320;
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(image, 0, 0, width, height);
+      setProfileAvatarDraft(canvas.toDataURL("image/jpeg", 0.82));
+      URL.revokeObjectURL(objectUrl);
+    };
+    image.onerror = () => URL.revokeObjectURL(objectUrl);
+    image.src = objectUrl;
+  }
 
   return (
     <section className="w-full max-w-4xl pb-20 md:pb-6">
@@ -1557,11 +1607,34 @@ function SettingsView({
           <div className="flex gap-3"><Thumb>👨‍👩‍👧</Thumb><div><b>家族メンバー</b><p className="meta">{members.length ? `${members.map((member) => member.displayName).join("・")} の${members.length}名` : "メンバー未取得"}</p></div></div>
           <div className="mt-[14px]">
             <label className="block text-left text-[12.5px] font-extrabold leading-relaxed">あなたの表示名</label>
-            <div className="mt-[6px] flex gap-2">
-              <input className="input" value={displayNameDraft} onChange={(event) => setDisplayNameDraft(event.target.value)} placeholder="例：ママ / パパ" />
+            <div className="mt-[6px] flex items-center gap-3">
+              <Avatar name={displayNameDraft || "あなた"} avatarUrl={profileAvatarDraft} size="lg" />
+              <div className="min-w-0 flex-1">
+                <input className="input" value={displayNameDraft} onChange={(event) => setDisplayNameDraft(event.target.value)} placeholder="例：ママ / パパ" />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <label className="grid min-h-10 cursor-pointer place-items-center rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-xs font-extrabold">
+                    画像を設定
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(event) => updateAvatar(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                  {profileAvatarDraft ? (
+                    <button
+                      type="button"
+                      onClick={() => setProfileAvatarDraft("")}
+                      className="min-h-10 rounded-full px-4 py-2 text-xs font-extrabold text-[#E4564A]"
+                    >
+                      画像を削除
+                    </button>
+                  ) : null}
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => onSaveDisplayName(displayNameDraft)}
+                onClick={() => onSaveDisplayName(displayNameDraft, profileAvatarDraft)}
                 className="min-h-12 shrink-0 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold"
               >
                 保存
@@ -1586,9 +1659,7 @@ function SettingsView({
             <div className="space-y-2">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center gap-2 text-xs">
-                  <span className="grid size-7 place-items-center rounded-full bg-[#6E8B4E] font-extrabold text-white">
-                    {member.displayName[0] || "家"}
-                  </span>
+                  <Avatar name={member.displayName || "家族"} avatarUrl={member.avatarUrl} size="sm" />
                   <span>
                     <b>{member.displayName}</b>
                     {member.email ? <span className="meta ml-2">{member.email}</span> : null}
@@ -1672,8 +1743,28 @@ function Overline({ children }: { children: React.ReactNode }) {
   return <span className="font-[var(--font-outfit)] text-[11px] font-extrabold tracking-[.12em] text-[#E0734D]">{children}</span>;
 }
 
+function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl?: string; size?: "xs" | "sm" | "md" | "lg" }) {
+  const sizeClass = {
+    xs: "size-[18px] text-[9px]",
+    sm: "size-[30px] text-xs",
+    md: "size-9 text-sm",
+    lg: "size-14 text-base",
+  }[size];
+  const pixelSize = size === "lg" ? 56 : size === "md" ? 36 : size === "sm" ? 30 : 18;
+
+  return (
+    <span className={`relative grid shrink-0 overflow-hidden rounded-full bg-[#6E8B4E] ${sizeClass} place-items-center font-extrabold text-white`}>
+      {avatarUrl ? (
+        <Image src={avatarUrl} alt="" width={pixelSize} height={pixelSize} unoptimized className="size-full object-cover" />
+      ) : (
+        <span>{(name || "家")[0]}</span>
+      )}
+    </span>
+  );
+}
+
 function Thumb({ children }: { children: React.ReactNode }) {
-  return <span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">{children}</span>;
+  return <span className="grid size-14 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-3xl">{children}</span>;
 }
 
 function LogoMark({ small = false, large = false, hero = false }: { small?: boolean; large?: boolean; hero?: boolean }) {

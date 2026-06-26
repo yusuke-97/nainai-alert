@@ -21,6 +21,7 @@ create table if not exists profiles (
   household_id uuid references households(id) on delete set null,
   display_name text,
   email text,
+  avatar_url text,
   created_at timestamptz not null default now()
 );
 
@@ -76,6 +77,7 @@ alter table status_change_logs enable row level security;
 alter table notifications_log enable row level security;
 
 alter table households add column if not exists created_by uuid references auth.users(id) on delete set null;
+alter table profiles add column if not exists avatar_url text;
 alter table items add column if not exists icon text not null default '🧴';
 alter table notifications_log add column if not exists dedupe_key text;
 
