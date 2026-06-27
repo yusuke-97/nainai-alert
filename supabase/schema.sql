@@ -70,12 +70,35 @@ create table if not exists notifications_log (
   sent_at timestamptz not null default now()
 );
 
+create table if not exists shopping_notifications (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references households(id) on delete cascade,
+  created_by uuid references profiles(id) on delete set null,
+  message text not null,
+  line_status text,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists shopping_notification_items (
+  id uuid primary key default gen_random_uuid(),
+  notification_id uuid not null references shopping_notifications(id) on delete cascade,
+  item_id uuid references items(id) on delete set null,
+  item_name text not null,
+  status item_status not null,
+  volume text,
+  memo text,
+  restocked boolean not null default false
+);
+
 alter table households enable row level security;
 alter table profiles enable row level security;
 alter table items enable row level security;
 alter table purchase_logs enable row level security;
 alter table status_change_logs enable row level security;
 alter table notifications_log enable row level security;
+alter table shopping_notifications enable row level security;
+alter table shopping_notification_items enable row level security;
 
 alter table households add column if not exists created_by uuid references auth.users(id) on delete set null;
 alter table households add column if not exists category_icons jsonb;
@@ -90,6 +113,8 @@ grant select, insert, update, delete on items to authenticated;
 grant select, insert, update, delete on purchase_logs to authenticated;
 grant select, insert, update, delete on status_change_logs to authenticated;
 grant select on notifications_log to authenticated;
+grant select, insert, update on shopping_notifications to authenticated;
+grant select, insert, update on shopping_notification_items to authenticated;
 
 create or replace function current_household_id()
 returns uuid
@@ -169,6 +194,26 @@ drop policy if exists "notifications_log_member_select" on notifications_log;
 create policy "notifications_log_member_select" on notifications_log
 for select using (household_id = current_household_id());
 
+drop policy if exists "shopping_notifications_member_all" on shopping_notifications;
+create policy "shopping_notifications_member_all" on shopping_notifications
+for all using (household_id = current_household_id()) with check (household_id = current_household_id());
+
+drop policy if exists "shopping_notification_items_member_all" on shopping_notification_items;
+create policy "shopping_notification_items_member_all" on shopping_notification_items
+for all using (
+  exists (
+    select 1 from shopping_notifications
+    where shopping_notifications.id = shopping_notification_items.notification_id
+      and shopping_notifications.household_id = current_household_id()
+  )
+) with check (
+  exists (
+    select 1 from shopping_notifications
+    where shopping_notifications.id = shopping_notification_items.notification_id
+      and shopping_notifications.household_id = current_household_id()
+  )
+);
+
 create or replace function join_household_by_invite(code text)
 returns uuid
 language plpgsql
@@ -204,3 +249,5 @@ create index if not exists idx_purchase_logs_item_date on purchase_logs(item_id,
 create index if not exists idx_status_logs_item_date on status_change_logs(item_id, changed_at desc);
 create index if not exists idx_notifications_dedupe on notifications_log(item_id, status, sent_at desc);
 create unique index if not exists idx_notifications_dedupe_key on notifications_log(dedupe_key) where dedupe_key is not null;
+create index if not exists idx_shopping_notifications_household_date on shopping_notifications(household_id, created_at desc);
+create index if not exists idx_shopping_notification_items_notification on shopping_notification_items(notification_id);

@@ -58,6 +58,42 @@ type ActivityLog = {
   message: string;
 };
 
+type AppNotification = {
+  id: string;
+  itemName: string;
+  status: "low" | "out";
+  changedBy: string;
+  changedAt: string;
+  message: string;
+};
+
+type ShoppingNotificationItem = {
+  id: string;
+  itemId: string | null;
+  itemName: string;
+  status: "low" | "out";
+  volume: string;
+  memo: string;
+  restocked: boolean;
+};
+
+type ShoppingNotification = {
+  id: string;
+  message: string;
+  lineStatus: string;
+  resolvedAt: string | null;
+  createdAt: string;
+  items: ShoppingNotificationItem[];
+};
+
+type ShoppingNotificationResolveItem = {
+  id: string;
+  itemId: string | null;
+  restocked: boolean;
+  volume: string;
+  memo: string;
+};
+
 type ProfileRow = {
   id: string;
   household_id: string | null;
@@ -104,6 +140,23 @@ type StatusLogRow = {
   to_status: ItemStatus;
   notified: boolean;
   changed_at: string;
+};
+
+type ShoppingNotificationRow = {
+  id: string;
+  message: string;
+  line_status: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  shopping_notification_items?: {
+    id: string;
+    item_id: string | null;
+    item_name: string;
+    status: "low" | "out";
+    volume: string | null;
+    memo: string | null;
+    restocked: boolean;
+  }[];
 };
 
 type HouseholdMember = {
@@ -346,7 +399,10 @@ export default function Home() {
   const [toast, setToast] = useState(isSupabaseConfigured ? "" : `${supabaseConfigError}。.env.localを確認してください`);
   const [items, setItems] = useState(initialItems);
   const [logs, setLogs] = useState(initialLogs);
+  const [shoppingNotifications, setShoppingNotifications] = useState<ShoppingNotification[]>([]);
   const [categoryIcons, setCategoryIcons] = useState<CategoryIcons>(defaultCategoryIcons);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(() => {
     const match = pathname.match(/^\/items\/([^/]+)/);
     return match?.[1] === "new" ? "" : match?.[1] ?? "";
@@ -354,12 +410,14 @@ export default function Home() {
   const [restockId, setRestockId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StockItem | null>(null);
   const [statusConfirm, setStatusConfirm] = useState<{ itemId: string; to: ItemStatus } | null>(null);
+  const [batchNotifyConfirmOpen, setBatchNotifyConfirmOpen] = useState(false);
   const [recentNotifications, setRecentNotifications] = useState<Record<string, number>>({});
   const notificationLocksRef = useRef<Set<string>>(new Set());
   const [form, setForm] = useState({ name: "", category: "調味料" as Category, note: "" });
   const [editForm, setEditForm] = useState({ name: "", category: "調味料" as Category, note: "" });
   const isLoggedIn = Boolean(authUser);
   const lineConnected = Boolean(lineTargetId);
+  const notificationStorageKey = authUser?.id && householdId ? `nainai-notifications-read:${householdId}:${authUser.id}` : "";
 
   const loadHouseholdData = useCallback(async (user: User) => {
     if (!supabase) return;
@@ -404,8 +462,11 @@ export default function Home() {
       setLineTargetType(null);
       setLineTargetId(null);
       setMembers([]);
+      setReadNotificationIds([]);
+      setNotificationPanelOpen(false);
       setItems([]);
       setLogs([]);
+      setShoppingNotifications([]);
       setScreen("setup");
       setToast("世帯を作成または招待コードで参加してください");
       return;
@@ -428,6 +489,8 @@ export default function Home() {
     setInviteCode(householdRow.invite_code ?? "");
     setLineTargetType(householdRow.line_target_type);
     setLineTargetId(householdRow.line_target_id);
+    const storedReadNotifications = window.localStorage.getItem(`nainai-notifications-read:${householdRow.id}:${user.id}`);
+    setReadNotificationIds(storedReadNotifications ? (JSON.parse(storedReadNotifications) as string[]) : []);
     const nextCategoryIcons = normalizeCategoryIcons(householdRow.category_icons);
     setCategoryIcons(nextCategoryIcons);
 
@@ -478,6 +541,12 @@ export default function Home() {
             .limit(80),
         ])
       : [{ data: [] }, { data: [] }];
+    const { data: shoppingNotificationData } = await supabase
+      .from("shopping_notifications")
+      .select("id, message, line_status, resolved_at, created_at, shopping_notification_items(id, item_id, item_name, status, volume, memo, restocked)")
+      .eq("household_id", householdRow.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
 
     const purchases = (purchaseData ?? []) as PurchaseLogRow[];
     const nextItems = itemRows.map<StockItem>((item) => ({
@@ -507,6 +576,7 @@ export default function Home() {
       return acc;
     }, {});
     const statusRows = (statusData ?? []) as StatusLogRow[];
+    const shoppingNotificationRows = (shoppingNotificationData ?? []) as ShoppingNotificationRow[];
     setItems(nextItems);
     setLogs(
       statusRows.map((log) => ({
@@ -519,6 +589,24 @@ export default function Home() {
         changedAt: formatDateTime(log.changed_at),
         notified: log.notified,
         message: log.notified ? "LINE通知済み" : "通知なし",
+      })),
+    );
+    setShoppingNotifications(
+      shoppingNotificationRows.map((notification) => ({
+        id: notification.id,
+        message: notification.message,
+        lineStatus: notification.line_status || "",
+        resolvedAt: notification.resolved_at ? formatDateTime(notification.resolved_at) : null,
+        createdAt: formatDateTime(notification.created_at),
+        items: (notification.shopping_notification_items ?? []).map((item) => ({
+          id: item.id,
+          itemId: item.item_id,
+          itemName: item.item_name,
+          status: item.status,
+          volume: item.volume ?? "",
+          memo: item.memo ?? "",
+          restocked: item.restocked,
+        })),
       })),
     );
     setToast("");
@@ -561,8 +649,11 @@ export default function Home() {
         setProfileAvatarUrl("");
         setProfileAvatarDraft("");
         setCategoryIcons(defaultCategoryIcons);
+        setReadNotificationIds([]);
+        setNotificationPanelOpen(false);
         setItems([]);
         setLogs([]);
+        setShoppingNotifications([]);
         setScreen("login");
       }
       setAuthLoading(false);
@@ -613,6 +704,20 @@ export default function Home() {
       { 調味料: 0, 食料品: 0, 日用品: 0, 飲料品: 0, その他: 0 },
     );
   }, [items]);
+  const appNotifications = useMemo<AppNotification[]>(() => {
+    return logs
+      .filter((log) => log.to === "low" || log.to === "out")
+      .map((log) => ({
+        id: log.id,
+        itemName: log.itemName,
+        status: log.to as "low" | "out",
+        changedBy: log.changedBy,
+        changedAt: log.changedAt,
+        message: log.to === "out" ? "在庫切れになりました" : "残りわずかになりました",
+      }));
+  }, [logs]);
+  const unreadNotificationCount = appNotifications.filter((notification) => !readNotificationIds.includes(notification.id)).length;
+  const batchNotifyCount = items.filter((item) => item.status === "low" || item.status === "out").length;
 
   function requireLogin(next: Screen) {
     if (!isLoggedIn) {
@@ -626,6 +731,35 @@ export default function Home() {
       return;
     }
     setScreen(next);
+  }
+
+  function openNotifications() {
+    setNotificationPanelOpen(true);
+    const nextReadIds = Array.from(new Set([...readNotificationIds, ...appNotifications.map((notification) => notification.id)]));
+    setReadNotificationIds(nextReadIds);
+    if (notificationStorageKey) {
+      window.localStorage.setItem(notificationStorageKey, JSON.stringify(nextReadIds));
+    }
+  }
+
+  async function sendBatchNotification() {
+    if (!supabase || !authUser) return;
+    setBatchNotifyConfirmOpen(false);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const response = await fetch("/api/notify/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+      },
+    }).catch(() => null);
+    const result = response ? ((await response.json().catch(() => null)) as { ok?: boolean; itemCount?: number; notified?: boolean; reason?: string } | null) : null;
+    if (!result?.ok) {
+      setToast("まとめてLINE通知に失敗しました");
+      return;
+    }
+    await loadHouseholdData(authUser);
+    setToast(result.itemCount ? "" : "通知対象のアイテムがありません");
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -863,10 +997,10 @@ export default function Home() {
     if (!statusConfirm) return;
     const pending = statusConfirm;
     setStatusConfirm(null);
-    await changeStatus(pending.itemId, pending.to);
+    await changeStatus(pending.itemId, pending.to, false);
   }
 
-  async function changeStatus(itemId: string, to: ItemStatus) {
+  async function changeStatus(itemId: string, to: ItemStatus, notifyLine = false) {
     if (!supabase || !authUser) return;
     const item = items.find((target) => target.id === itemId);
     if (!item || item.status === to) return;
@@ -877,11 +1011,11 @@ export default function Home() {
 
     const updatedAt = nowText();
     const nextItem = { ...item, status: to, updatedBy: displayName || "あなた", updatedAt };
-    const message = buildLineMessage(to, nextItem);
+    const message = to === "out" ? buildLineMessage(to, nextItem) : "";
     const key = `${itemId}:${to}`;
     const lastSent = recentNotifications[key] ?? 0;
     const deduped = Date.now() - lastSent < 10 * 60 * 1000;
-    const shouldTryNotify = (to === "low" || to === "out") && Boolean(lineTargetId) && !deduped;
+    const shouldTryNotify = notifyLine && to === "out" && Boolean(lineTargetId) && !deduped;
     if (shouldTryNotify) {
       if (notificationLocksRef.current.has(key)) {
         setToast("LINE通知を送信中です。少し待ってから操作してください");
@@ -989,6 +1123,83 @@ export default function Home() {
     setToast("");
   }
 
+  async function resolveShoppingNotification(notificationId: string, updates: ShoppingNotificationResolveItem[]) {
+    if (!supabase || !authUser) return;
+
+    for (const update of updates) {
+      const { error } = await supabase
+        .from("shopping_notification_items")
+        .update({
+          restocked: update.restocked,
+          volume: update.volume.trim() || null,
+          memo: update.memo.trim() || null,
+        })
+        .eq("id", update.id);
+
+      if (error) {
+        setToast(`通知履歴の更新に失敗しました: ${error.message}`);
+        return;
+      }
+    }
+
+    for (const update of updates.filter((item) => item.restocked && item.itemId)) {
+      const currentItem = items.find((item) => item.id === update.itemId);
+      const purchaseMemo = [update.volume.trim(), update.memo.trim()].filter(Boolean).join(" / ");
+
+      if (purchaseMemo) {
+        const { error: purchaseError } = await supabase.from("purchase_logs").insert({
+          item_id: update.itemId,
+          purchased_by: authUser.id,
+          volume: update.volume.trim(),
+          memo: update.memo.trim(),
+        });
+
+        if (purchaseError) {
+          setToast(`購入メモの保存に失敗しました: ${purchaseError.message}`);
+          return;
+        }
+      }
+
+      const { error: itemError } = await supabase
+        .from("items")
+        .update({
+          status: "in_stock",
+          last_purchase_memo: purchaseMemo || currentItem?.lastPurchaseMemo || null,
+          updated_by: authUser.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", update.itemId);
+
+      if (itemError) {
+        setToast(`在庫ステータスの更新に失敗しました: ${itemError.message}`);
+        return;
+      }
+
+      if (currentItem?.status && currentItem.status !== "in_stock") {
+        await supabase.from("status_change_logs").insert({
+          item_id: update.itemId,
+          changed_by: authUser.id,
+          from_status: currentItem.status,
+          to_status: "in_stock",
+          notified: false,
+        });
+      }
+    }
+
+    const { error: notificationError } = await supabase
+      .from("shopping_notifications")
+      .update({ resolved_at: new Date().toISOString() })
+      .eq("id", notificationId);
+
+    if (notificationError) {
+      setToast(`通知履歴の解決に失敗しました: ${notificationError.message}`);
+      return;
+    }
+
+    await loadHouseholdData(authUser);
+    setToast("");
+  }
+
   async function logout() {
     if (supabase) await supabase.auth.signOut();
     setToast("");
@@ -1067,6 +1278,8 @@ export default function Home() {
               isLoggedIn={isLoggedIn}
               household={household}
               lineConnected={lineConnected}
+              unreadNotificationCount={unreadNotificationCount}
+              onNotifications={openNotifications}
               onSettings={() => requireLogin("settings")}
             />
           </div>
@@ -1082,6 +1295,7 @@ export default function Home() {
               items={visibleItems}
               totalCount={items.length}
               needCount={needCount}
+              batchNotifyCount={batchNotifyCount}
               categoryCounts={categoryCounts}
               filter={filter}
               setFilter={setFilter}
@@ -1091,6 +1305,7 @@ export default function Home() {
                 requireLogin("detail");
               }}
               onStatus={requestStatusChange}
+              onBatchNotify={() => setBatchNotifyConfirmOpen(true)}
               onLoadSample={loadSampleData}
             />
           )}
@@ -1116,7 +1331,13 @@ export default function Home() {
           ) : null}
           {effectiveScreen === "detail" && !selectedItem ? <MissingItemView onBack={() => setScreen("stock")} /> : null}
           {effectiveScreen === "edit" && !selectedItem ? <MissingItemView onBack={() => setScreen("stock")} /> : null}
-          {effectiveScreen === "history" && <HistoryView logs={logs} />}
+          {effectiveScreen === "history" && (
+            <HistoryHubView
+              logs={logs}
+              shoppingNotifications={shoppingNotifications}
+              onResolveShoppingNotification={resolveShoppingNotification}
+            />
+          )}
           {effectiveScreen === "settings" && (
             <SettingsView
               household={household}
@@ -1141,11 +1362,22 @@ export default function Home() {
         {isLoggedIn && household ? <MobileNav screen={effectiveScreen} go={requireLogin} /> : null}
         {toast ? <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-center text-xs font-bold shadow-[0_10px_30px_rgba(80,60,30,.16)] md:bottom-6">{toast}</div> : null}
         {restockItem ? <RestockModal item={restockItem} onSubmit={restock} onClose={() => setRestockId(null)} /> : null}
+        {notificationPanelOpen ? (
+          <NotificationPanel notifications={appNotifications} onClose={() => setNotificationPanelOpen(false)} />
+        ) : null}
+        {batchNotifyConfirmOpen ? (
+          <BatchNotifyConfirmModal count={batchNotifyCount} onConfirm={sendBatchNotification} onClose={() => setBatchNotifyConfirmOpen(false)} />
+        ) : null}
         {statusConfirm && statusConfirmItem ? (
           <StatusConfirmModal
             item={statusConfirmItem}
             to={statusConfirm.to}
             onConfirm={confirmStatusChange}
+            onConfirmWithLine={async () => {
+              const pending = statusConfirm;
+              setStatusConfirm(null);
+              await changeStatus(pending.itemId, pending.to, true);
+            }}
             onClose={() => setStatusConfirm(null)}
           />
         ) : null}
@@ -1159,11 +1391,15 @@ function AppHeader({
   isLoggedIn,
   household,
   lineConnected,
+  unreadNotificationCount,
+  onNotifications,
   onSettings,
 }: {
   isLoggedIn: boolean;
   household: string;
   lineConnected: boolean;
+  unreadNotificationCount: number;
+  onNotifications: () => void;
   onSettings: () => void;
 }) {
   return (
@@ -1174,9 +1410,24 @@ function AppHeader({
         <p className="mt-1 text-[11px] font-bold text-[#7A746B]">{household || "家族の在庫を、ひとつの場所で。"}</p>
       </div>
       {isLoggedIn ? (
-        <button onClick={onSettings} className="ml-auto rounded-xl border-2 border-[#2B2A27] bg-white px-3 py-2 font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em]">
-          {lineConnected ? "LINE連携済み" : "LINE未連携"}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={onSettings} className="rounded-xl border-2 border-[#2B2A27] bg-white px-3 py-2 font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em]">
+            {lineConnected ? "LINE連携済み" : "LINE未連携"}
+          </button>
+          <button
+            type="button"
+            onClick={onNotifications}
+            aria-label={`通知 ${unreadNotificationCount}件`}
+            className="relative grid size-10 place-items-center rounded-xl border-2 border-[#2B2A27] bg-white text-lg font-extrabold"
+          >
+            🔔
+            {unreadNotificationCount ? (
+              <span className="absolute -right-2 -top-2 grid min-w-5 place-items-center rounded-full border-2 border-white bg-[#E4564A] px-1 text-[10px] font-black leading-4 text-white">
+                {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+              </span>
+            ) : null}
+          </button>
+        </div>
       ) : null}
     </header>
   );
@@ -1324,12 +1575,14 @@ function StockView(props: {
   items: StockItem[];
   totalCount: number;
   needCount: number;
+  batchNotifyCount: number;
   categoryCounts: Record<Category, number>;
   filter: Filter;
   setFilter: (filter: Filter) => void;
   onAdd: () => void;
   onDetail: (id: string) => void;
   onStatus: (id: string, status: ItemStatus) => void;
+  onBatchNotify: () => void;
   onLoadSample: () => void;
 }) {
   return (
@@ -1346,7 +1599,17 @@ function StockView(props: {
             <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category} ({props.categoryCounts[category]})</FilterChip>
           ))}
         </div>
-        <button onClick={props.onAdd} className="btn-primary mt-1 w-full shrink-0 px-5 py-2.5 md:mt-0 md:w-auto">➕ 追加</button>
+        <div className="grid gap-3 md:w-auto">
+          <button
+            type="button"
+            onClick={props.onBatchNotify}
+            disabled={!props.batchNotifyCount}
+            className="min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold disabled:border-[#D8CCB7] disabled:bg-[#F5EFE2] disabled:text-[#9A9183] md:w-auto"
+          >
+            🛒 購入品をまとめて通知 ({props.batchNotifyCount})
+          </button>
+          <button onClick={props.onAdd} className="btn-primary mt-1 w-full shrink-0 px-5 py-2.5 md:mt-0 md:w-auto">➕ 追加</button>
+        </div>
       </div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {props.items.map((item) => (
@@ -1533,6 +1796,7 @@ function EditItemView({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function HistoryView({ logs }: { logs: ActivityLog[] }) {
   return (
     <section className="w-full max-w-3xl pb-20 md:pb-6">
@@ -1549,6 +1813,198 @@ function HistoryView({ logs }: { logs: ActivityLog[] }) {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function HistoryHubView({
+  logs,
+  shoppingNotifications,
+  onResolveShoppingNotification,
+}: {
+  logs: ActivityLog[];
+  shoppingNotifications: ShoppingNotification[];
+  onResolveShoppingNotification: (notificationId: string, updates: ShoppingNotificationResolveItem[]) => void | Promise<void>;
+}) {
+  const [view, setView] = useState<"menu" | "changes" | "shopping">("menu");
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
+  const selectedNotification = shoppingNotifications.find((notification) => notification.id === selectedNotificationId) ?? null;
+  const unresolvedCount = shoppingNotifications.filter((notification) => !notification.resolvedAt).length;
+
+  if (selectedNotification) {
+    return (
+      <ShoppingNotificationDetail
+        notification={selectedNotification}
+        onBack={() => setSelectedNotificationId(null)}
+        onResolve={async (updates) => {
+          await onResolveShoppingNotification(selectedNotification.id, updates);
+          setSelectedNotificationId(null);
+        }}
+      />
+    );
+  }
+
+  if (view === "changes") {
+    return (
+      <section className="w-full max-w-3xl pb-20 md:pb-6">
+        <button type="button" onClick={() => setView("menu")} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
+          ← 履歴に戻る
+        </button>
+        <Overline>ACTIVITY</Overline>
+        <h1 className="heading">変更履歴</h1>
+        <div className="space-y-3">
+          {logs.map((log) => (
+            <div key={log.id} className="card flex items-center gap-3">
+              <Avatar name={log.changedBy} avatarUrl={log.changedByAvatarUrl} size="md" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm"><b>{log.itemName}</b> を <StatusPill status={log.to} small /> に変更</p>
+                <p className="meta">{log.changedBy} ・ {log.changedAt} ・ {log.message}</p>
+              </div>
+            </div>
+          ))}
+          {!logs.length ? <p className="note">変更履歴はまだありません。</p> : null}
+        </div>
+      </section>
+    );
+  }
+
+  if (view === "shopping") {
+    return (
+      <section className="w-full max-w-3xl pb-20 md:pb-6">
+        <button type="button" onClick={() => setView("menu")} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
+          ← 履歴に戻る
+        </button>
+        <Overline>SHOPPING NOTICE</Overline>
+        <h1 className="heading">通知履歴</h1>
+        <div className="space-y-4">
+          {shoppingNotifications.map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              onClick={() => setSelectedNotificationId(notification.id)}
+              className="card block w-full text-left active:translate-y-[1px] active:bg-[#FFF7EC]"
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className={`rounded-full border-2 px-3 py-1 text-xs font-extrabold ${notification.resolvedAt ? "border-[#BFD8B4] bg-[#F1FAEC] text-[#4C7A44]" : "border-[#E0734D] bg-[#FFF1E8] text-[#C45B37]"}`}>
+                  {notification.resolvedAt ? "解決済み" : "未解決"}
+                </span>
+                <span className="meta">{notification.createdAt}</span>
+              </div>
+              <p className="text-sm font-extrabold leading-6">購入品 {notification.items.length}件</p>
+              <p className="meta mt-1">LINE送信: {notification.lineStatus || "未記録"}{notification.resolvedAt ? ` ・ 解決: ${notification.resolvedAt}` : ""}</p>
+            </button>
+          ))}
+          {!shoppingNotifications.length ? <p className="note">通知履歴はまだありません。</p> : null}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="w-full max-w-2xl pb-20 md:pb-6">
+      <Overline>HISTORY</Overline>
+      <h1 className="heading">履歴</h1>
+      <div className="grid gap-4">
+        <SettingsMenuButton icon="🕘" title="変更履歴" meta={`${logs.length}件`} onClick={() => setView("changes")} />
+        <SettingsMenuButton icon="🛒" title="通知履歴" meta={`未解決 ${unresolvedCount}件 / 全${shoppingNotifications.length}件`} onClick={() => setView("shopping")} />
+      </div>
+    </section>
+  );
+}
+
+function ShoppingNotificationDetail({
+  notification,
+  onBack,
+  onResolve,
+}: {
+  notification: ShoppingNotification;
+  onBack: () => void;
+  onResolve: (updates: ShoppingNotificationResolveItem[]) => void | Promise<void>;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, ShoppingNotificationResolveItem>>(() =>
+    notification.items.reduce<Record<string, ShoppingNotificationResolveItem>>((acc, item) => {
+      acc[item.id] = {
+        id: item.id,
+        itemId: item.itemId,
+        restocked: item.restocked,
+        volume: item.volume,
+        memo: item.memo,
+      };
+      return acc;
+    }, {}),
+  );
+  const [saving, setSaving] = useState(false);
+  const updateDraft = (id: string, patch: Partial<ShoppingNotificationResolveItem>) => {
+    setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
+  };
+  const checkedCount = Object.values(drafts).filter((draft) => draft.restocked).length;
+
+  return (
+    <section className="w-full max-w-3xl pb-20 md:pb-6">
+      <button type="button" onClick={onBack} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
+        ← 通知履歴に戻る
+      </button>
+      <Overline>SHOPPING NOTICE</Overline>
+      <h1 className="heading">購入通知の詳細</h1>
+      <div className="card mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={`rounded-full border-2 px-3 py-1 text-xs font-extrabold ${notification.resolvedAt ? "border-[#BFD8B4] bg-[#F1FAEC] text-[#4C7A44]" : "border-[#E0734D] bg-[#FFF1E8] text-[#C45B37]"}`}>
+            {notification.resolvedAt ? "解決済み" : "未解決"}
+          </span>
+          <span className="meta">{notification.createdAt}</span>
+        </div>
+        <p className="meta mt-2">買えたものだけチェックすると、そのアイテムだけ在庫ありに戻ります。</p>
+      </div>
+      <div className="space-y-4">
+        {notification.items.map((item) => {
+          const draft = drafts[item.id];
+          return (
+            <div key={item.id} className="card">
+              <label className="flex min-h-12 items-center gap-3 text-sm font-extrabold">
+                <input
+                  type="checkbox"
+                  checked={draft.restocked}
+                  onChange={(event) => updateDraft(item.id, { restocked: event.target.checked })}
+                  className="size-5 accent-[#E0734D]"
+                  disabled={Boolean(notification.resolvedAt)}
+                />
+                <span className="min-w-0 flex-1">{item.itemName}</span>
+                <StatusPill status={item.status} small />
+              </label>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <input
+                  className="input"
+                  value={draft.volume}
+                  onChange={(event) => updateDraft(item.id, { volume: event.target.value })}
+                  placeholder="個数・容量"
+                  disabled={Boolean(notification.resolvedAt)}
+                />
+                <input
+                  className="input"
+                  value={draft.memo}
+                  onChange={(event) => updateDraft(item.id, { memo: event.target.value })}
+                  placeholder="購入メモ"
+                  disabled={Boolean(notification.resolvedAt)}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {!notification.resolvedAt ? (
+        <button
+          type="button"
+          onClick={async () => {
+            setSaving(true);
+            await onResolve(Object.values(drafts));
+            setSaving(false);
+          }}
+          disabled={saving}
+          className="btn-primary mt-6 w-full"
+        >
+          解決済みにする <span className="font-[var(--font-outfit)] text-xs opacity-70">{checkedCount} ITEMS</span>
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -1967,14 +2423,16 @@ function StatusConfirmModal({
   item,
   to,
   onConfirm,
+  onConfirmWithLine,
   onClose,
 }: {
   item: StockItem;
   to: ItemStatus;
   onConfirm: () => void;
+  onConfirmWithLine: () => void;
   onClose: () => void;
 }) {
-  const willNotify = to === "low" || to === "out";
+  const willNotify = to === "out";
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-[#2B2A27]/40 px-4">
@@ -1983,13 +2441,71 @@ function StatusConfirmModal({
         <h2 className="heading">ステータスを変更しますか？</h2>
         <p className="text-sm leading-7">
           <b>{item.name}</b> を <StatusPill status={to} small /> に変更します。
-          {willNotify ? " LINE連携中の場合は、確定後に通知が送信されることがあります。" : ""}
+          {to === "low" ? " 確定後、お知らせに追加されます。" : ""}
+          {willNotify ? " LINE連携中の場合は、確定後にLINE通知とお知らせが送信されます。" : ""}
         </p>
-        <div className="mt-5 flex gap-3">
-          <button type="button" onClick={onClose} className="min-h-12 flex-1 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">キャンセル</button>
-          <button type="button" onClick={onConfirm} className="btn-primary flex-1">変更する</button>
+        {to === "out" ? (
+          <div className="mt-5 grid gap-3">
+            <button type="button" onClick={onConfirmWithLine} className="btn-primary w-full">今すぐLINE通知して変更</button>
+            <button type="button" onClick={onConfirm} className="min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">後でまとめて通知する</button>
+            <button type="button" onClick={onClose} className="min-h-12 w-full rounded-full px-5 py-3 text-sm font-extrabold text-[#7A746B]">キャンセル</button>
+          </div>
+        ) : (
+          <div className="mt-5 flex gap-3">
+            <button type="button" onClick={onClose} className="min-h-12 flex-1 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">キャンセル</button>
+            <button type="button" onClick={onConfirm} className="btn-primary flex-1">変更する</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BatchNotifyConfirmModal({ count, onConfirm, onClose }: { count: number; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-[#2B2A27]/40 px-4">
+      <div className="w-full max-w-sm rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
+        <Overline>LINE</Overline>
+        <h2 className="heading">まとめて通知しますか？</h2>
+        <p className="text-sm leading-7">要購入のアイテム {count} 件を、1通のLINEメッセージにまとめて通知します。通知履歴にも保存されます。</p>
+        <div className="mt-5 grid gap-3">
+          <button type="button" onClick={onConfirm} disabled={!count} className="btn-primary w-full disabled:opacity-50">LINE通知する</button>
+          <button type="button" onClick={onClose} className="min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">キャンセル</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function NotificationPanel({ notifications, onClose }: { notifications: AppNotification[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 bg-[#2B2A27]/35 px-4 py-5">
+      <section className="ml-auto flex h-full w-full max-w-md flex-col rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">🔔</div>
+          <div className="min-w-0 flex-1">
+            <Overline>NOTICE</Overline>
+            <h2 className="text-lg font-black">お知らせ</h2>
+          </div>
+          <button type="button" onClick={onClose} className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold">閉じる</button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          {notifications.length ? (
+            notifications.map((notification) => (
+              <div key={notification.id} className="rounded-[14px] border-2 border-[#E7DCC6] bg-[#FFFBF4] p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <StatusPill status={notification.status} small />
+                  <span className="meta font-[var(--font-outfit)]">{notification.changedAt}</span>
+                </div>
+                <p className="text-sm font-extrabold leading-6">{notification.itemName}</p>
+                <p className="meta mt-1">{notification.message} ・ {notification.changedBy}</p>
+              </div>
+            ))
+          ) : (
+            <p className="note">お知らせはまだありません。ステータスが「わずか」または「切れ」になるとここに表示されます。</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

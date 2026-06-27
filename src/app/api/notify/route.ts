@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "itemId and status are required" }, { status: 400 });
   }
 
-  if (body.status !== "low" && body.status !== "out") {
+  if (body.status !== "out") {
     return NextResponse.json({ ok: true, notified: false, reason: "status_notifiable_false" });
   }
 
