@@ -573,6 +573,15 @@ export default function Home() {
   }, [filter, items]);
 
   const needCount = items.filter((item) => item.status === "low" || item.status === "out").length;
+  const categoryCounts = useMemo(() => {
+    return items.reduce<Record<Category, number>>(
+      (acc, item) => {
+        acc[item.category] += 1;
+        return acc;
+      },
+      { 調味料: 0, 日用品: 0, 飲料: 0, その他: 0 },
+    );
+  }, [items]);
 
   function requireLogin(next: Screen) {
     if (!isLoggedIn) {
@@ -1021,7 +1030,9 @@ export default function Home() {
             <StockView
               household={household}
               items={visibleItems}
+              totalCount={items.length}
               needCount={needCount}
+              categoryCounts={categoryCounts}
               filter={filter}
               setFilter={setFilter}
               onAdd={() => requireLogin("add")}
@@ -1259,7 +1270,9 @@ function SetupView({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>)
 function StockView(props: {
   household: string;
   items: StockItem[];
+  totalCount: number;
   needCount: number;
+  categoryCounts: Record<Category, number>;
   filter: Filter;
   setFilter: (filter: Filter) => void;
   onAdd: () => void;
@@ -1275,10 +1288,10 @@ function StockView(props: {
           <h1 className="heading mb-0">在庫一覧</h1>
         </div>
         <div className="flex flex-wrap gap-2 md:ml-auto md:justify-end">
-          <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて</FilterChip>
-          <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 {props.needCount}</FilterChip>
+          <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて ({props.totalCount})</FilterChip>
+          <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 ({props.needCount})</FilterChip>
           {(["調味料", "日用品", "飲料", "その他"] as Category[]).map((category) => (
-            <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category}</FilterChip>
+            <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category} ({props.categoryCounts[category]})</FilterChip>
           ))}
         </div>
         <button onClick={props.onAdd} className="btn-primary mt-1 w-full shrink-0 px-5 py-2.5 md:mt-0 md:w-auto">➕ 追加</button>
