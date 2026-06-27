@@ -1339,7 +1339,7 @@ function StockView(props: {
           <Overline>{props.household || "YAMADA FAMILY"}</Overline>
           <h1 className="heading mb-0">在庫一覧</h1>
         </div>
-        <div className="flex flex-wrap gap-2 md:ml-auto md:justify-end">
+        <div className="flex flex-wrap gap-x-4 gap-y-6 md:ml-auto md:justify-end">
           <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて ({props.totalCount})</FilterChip>
           <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 ({props.needCount})</FilterChip>
           {categories.map((category) => (
