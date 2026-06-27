@@ -1600,6 +1600,7 @@ function SettingsView({
 }) {
   const lineTargetLabel = lineTargetType === "user" ? "自分のLINE" : `${household} グループ`;
   const [categoryIconDraft, setCategoryIconDraft] = useState<CategoryIcons>(() => normalizeCategoryIcons(categoryIcons));
+  const [settingsSection, setSettingsSection] = useState<"menu" | "line" | "icons" | "members">("menu");
 
   function updateAvatar(file: File | null) {
     if (!file) return;
@@ -1621,12 +1622,175 @@ function SettingsView({
     image.src = objectUrl;
   }
 
+  const backToSettingsMenu = (
+    <div className="mb-4 block">
+      <button
+        type="button"
+        onClick={() => setSettingsSection("menu")}
+        className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold"
+      >
+        ← 設定へ戻る
+      </button>
+    </div>
+  );
+
+  if (settingsSection === "menu") {
+    return (
+      <section className="w-full max-w-3xl pb-20 md:pb-6">
+        <Overline>SETTINGS</Overline>
+        <h1 className="heading">設定</h1>
+        <div className="space-y-3">
+          <SettingsMenuButton
+            icon="💬"
+            title="LINE通知"
+            meta={lineConnected ? "連携済み" : "未連携"}
+            onClick={() => setSettingsSection("line")}
+          />
+          <SettingsMenuButton
+            icon={categoryIconDraft.その他}
+            title="カテゴリ別アイコン"
+            meta="カテゴリごとの表示アイコンを設定"
+            onClick={() => setSettingsSection("icons")}
+          />
+          <SettingsMenuButton
+            icon="👨‍👩‍👧"
+            title="家族メンバー"
+            meta={members.length ? `${members.length}名` : "メンバー未取得"}
+            onClick={() => setSettingsSection("members")}
+          />
+        </div>
+        <button onClick={onLogout} className="mt-5 rounded-full px-5 py-3 text-sm font-extrabold text-[#E4564A]">ログアウト</button>
+      </section>
+    );
+  }
+
+  if (settingsSection === "line") {
+    return (
+      <section className="w-full max-w-3xl pb-20 md:pb-6">
+        {backToSettingsMenu}
+        <Overline>SETTINGS</Overline>
+        <h1 className="heading">LINE通知</h1>
+        <div className="card">
+          <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
+          <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
+          <button
+            onClick={() => {
+              if (lineConnected) {
+                setLineConnected(false);
+                return;
+              }
+              if (lineFriendUrl) {
+                window.open(lineFriendUrl, "_blank", "noreferrer");
+                return;
+              }
+              setLineConnected(true);
+            }}
+            className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]"
+          >
+            {lineConnected ? "連携しなおす" : "友だち追加 / 連携する"}
+          </button>
+          <div className="mt-7 grid gap-6 sm:grid-cols-2">
+            {lineFriendUrl ? (
+              <a
+                href={lineFriendUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="grid min-h-11 place-items-center rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-center text-sm font-extrabold"
+              >
+                公式LINEを開く
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="min-h-11 rounded-full border-2 border-[#D8CCB7] bg-[#F5EFE2] px-4 py-2 text-sm font-extrabold text-[#9A9183]"
+              >
+                公式LINEを開く
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => lineFriendUrl && navigator.clipboard?.writeText(lineFriendUrl)}
+              disabled={!lineFriendUrl}
+              className="min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold disabled:border-[#D8CCB7] disabled:bg-[#F5EFE2] disabled:text-[#9A9183]"
+            >
+              公式LINE URLをコピー
+            </button>
+          </div>
+          {!lineFriendUrl ? <p className="meta mt-3">VercelにNEXT_PUBLIC_LINE_FRIEND_URLを設定すると、公式LINEへの導線が有効になります。</p> : null}
+          <div className="mt-4 rounded-[14px] border border-dashed border-[#B9AD98] bg-[#FFF9EC] p-3 text-xs font-bold leading-6 text-[#6F675D]">
+            <p>LINE連携コードは、通知先を登録するためのコードです。</p>
+            <p>自分だけに通知する場合は、公式LINEとのトークに送ってください。</p>
+            <p>家族グループに通知する場合は、公式LINEを入れたグループに送ってください。</p>
+            <p>送信後、そのトークまたはグループが通知先として保存されます。</p>
+          </div>
+          {/* <p className="note">残りわずか・在庫切れのみ通知。自分のLINEまたは1グループに集約し無料枠（月約200通）を節約。</p> */}
+        </div>
+      </section>
+    );
+  }
+
+  if (settingsSection === "icons") {
+    return (
+      <section className="w-full max-w-3xl pb-20 md:pb-6">
+        {backToSettingsMenu}
+        <Overline>SETTINGS</Overline>
+        <h1 className="heading">カテゴリ別アイコン</h1>
+        <div className="card">
+          <div className="flex gap-3">
+            <Thumb>{categoryIconDraft.その他}</Thumb>
+            <div>
+              <b>カテゴリ別アイコン</b>
+              <p className="meta">アイテムのアイコンはカテゴリごとに設定したものを表示します。</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-10">
+            {categories.map((category) => (
+              <div key={category}>
+                <div className="mb-4 flex items-center gap-2 text-sm font-extrabold">
+                  <span className="grid size-12 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">{categoryIconDraft[category]}</span>
+                  {category}
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-7">
+                  {categoryIconChoices.map((icon) => (
+                    <button
+                      type="button"
+                      key={`${category}-${icon}`}
+                      onClick={() => setCategoryIconDraft({ ...categoryIconDraft, [category]: icon })}
+                      aria-label={`${category} のアイコンを ${icon} にする`}
+                      aria-pressed={categoryIconDraft[category] === icon}
+                      className={`grid size-16 place-items-center rounded-xl border-2 text-[34px] leading-none ${
+                        categoryIconDraft[category] === icon
+                          ? "border-[#2B2A27] bg-[#FFF1E6] shadow-[0_3px_0_#2B2A27]"
+                          : "border-[#E7DCC6] bg-white"
+                      }`}
+                    >
+                      <span className="block scale-[1.7] leading-none">{icon}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => onSaveCategoryIcons(categoryIconDraft)}
+            className="btn-primary mt-10 w-full"
+          >
+            カテゴリアイコンを保存
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="w-full max-w-4xl pb-20 md:pb-6">
+      {backToSettingsMenu}
       <Overline>SETTINGS</Overline>
-      <h1 className="heading">設定 / LINE連携</h1>
+      <h1 className="heading">家族メンバー</h1>
       <div className="grid gap-5 md:grid-cols-2">
-        <div className="card">
+        <div className="hidden">
           <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
           <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
           <button
@@ -1682,7 +1846,7 @@ function SettingsView({
           </div>
           <p className="note">残りわずか・在庫切れのみ通知。自分のLINEまたは1グループに集約し無料枠（月約200通）を節約。</p>
         </div>
-        <div className="card">
+        <div className="hidden">
           <div className="flex gap-3">
             <Thumb>{categoryIconDraft.その他}</Thumb>
             <div>
@@ -1772,7 +1936,7 @@ function SettingsView({
               type="button"
               onClick={() => navigator.clipboard?.writeText(inviteCode)}
               disabled={!inviteCode}
-              className="mt-1 min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold"
+              className="mt-4 min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold"
             >
               📋 LINE連携コードをコピー
             </button>
@@ -1827,6 +1991,33 @@ function StatusConfirmModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function SettingsMenuButton({
+  icon,
+  title,
+  meta,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  meta: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-20 w-full items-center gap-3 rounded-[16px] border-2 border-[#2B2A27] bg-white p-4 text-left shadow-[0_4px_14px_rgba(80,60,30,0.08)]"
+    >
+      <span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-black">{title}</span>
+        <span className="meta mt-1 block">{meta}</span>
+      </span>
+      <span className="text-lg font-black text-[#7A746B]">›</span>
+    </button>
   );
 }
 
