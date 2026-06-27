@@ -1269,21 +1269,21 @@ function StockView(props: {
 }) {
   return (
     <div className="pb-20 md:pb-6">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start">
         <div>
           <Overline>{props.household || "YAMADA FAMILY"}</Overline>
           <h1 className="heading mb-0">在庫一覧</h1>
         </div>
-        <div className="flex gap-2 overflow-x-auto md:ml-auto">
+        <div className="flex flex-wrap gap-2 md:ml-auto md:justify-end">
           <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて</FilterChip>
           <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 {props.needCount}</FilterChip>
           {(["調味料", "日用品", "飲料", "その他"] as Category[]).map((category) => (
             <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category}</FilterChip>
           ))}
         </div>
-        <button onClick={props.onAdd} className="btn-primary shrink-0 px-5 py-2.5">➕ 追加</button>
+        <button onClick={props.onAdd} className="btn-primary mt-1 w-full shrink-0 px-5 py-2.5 md:mt-0 md:w-auto">➕ 追加</button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {props.items.map((item) => (
           <ItemCard key={item.id} item={item} onDetail={props.onDetail} onStatus={props.onStatus} />
         ))}

@@ -52,6 +52,7 @@ a {
 button:active,
 a:active {
   filter: brightness(0.96);
+  opacity: 0.82;
   transform: translateY(1px) scale(0.98);
 }
 
