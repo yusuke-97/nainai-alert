@@ -1419,9 +1419,9 @@ function AddItemView({
         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例：キッコーマン 特選丸大豆しょうゆ" />
       </Field>
       <Field label="カテゴリ">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-6">
           {categories.map((category) => (
-            <FilterChip key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</FilterChip>
+            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</CategoryButton>
           ))}
         </div>
       </Field>
@@ -1515,9 +1515,9 @@ function EditItemView({
         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       </Field>
       <Field label="カテゴリ">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-6">
           {categories.map((category) => (
-            <FilterChip key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</FilterChip>
+            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</CategoryButton>
           ))}
         </div>
       </Field>
@@ -1891,6 +1891,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button type="button" onClick={onClick} className={`shrink-0 rounded-full border-2 border-[#2B2A27] px-4 py-1.5 text-xs font-extrabold ${active ? "bg-[#33312E] text-white" : "bg-white text-[#33312E]"}`}>{children}</button>;
+}
+
+function CategoryButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-12 min-w-[112px] rounded-full border-2 border-[#2B2A27] px-5 py-3 text-sm font-extrabold ${
+        active ? "bg-[#33312E] text-white" : "bg-white text-[#33312E]"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function Overline({ children }: { children: React.ReactNode }) {
