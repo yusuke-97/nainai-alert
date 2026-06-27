@@ -41,6 +41,7 @@ type ActivityLog = {
   from: ItemStatus;
   to: ItemStatus;
   changedBy: string;
+  changedByAvatarUrl?: string;
   changedAt: string;
   notified: boolean;
   message: string;
@@ -483,6 +484,7 @@ export default function Home() {
         from: log.from_status ?? log.to_status,
         to: log.to_status,
         changedBy: log.changed_by ? members[log.changed_by]?.displayName || "家族" : "家族",
+        changedByAvatarUrl: log.changed_by ? members[log.changed_by]?.avatarUrl || "" : "",
         changedAt: formatDateTime(log.changed_at),
         notified: log.notified,
         message: log.notified ? "LINE通知済み" : "通知なし",
@@ -1467,7 +1469,7 @@ function HistoryView({ logs }: { logs: ActivityLog[] }) {
       <div className="space-y-3">
         {logs.map((log) => (
           <div key={log.id} className="card flex items-center gap-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#6E8B4E] text-sm font-extrabold text-white">{log.changedBy[0]}</span>
+            <Avatar name={log.changedBy} avatarUrl={log.changedByAvatarUrl} size="md" />
             <div className="min-w-0 flex-1">
               <p className="text-sm"><b>{log.itemName}</b> を <StatusPill status={log.to} small /> に変更</p>
               <p className="meta">{log.changedBy} ・ {log.changedAt} ・ {log.message}</p>
