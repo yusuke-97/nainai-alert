@@ -38,6 +38,28 @@ button {
   cursor: pointer;
 }
 
+button,
+a {
+  -webkit-tap-highlight-color: rgba(224, 115, 77, 0.2);
+  transition:
+    transform 120ms ease,
+    filter 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    opacity 120ms ease;
+}
+
+button:active,
+a:active {
+  filter: brightness(0.96);
+  transform: translateY(1px) scale(0.98);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .input {
   width: 100%;
   border: 2px solid #2b2a27;
@@ -67,6 +89,11 @@ button {
   font-size: 14px;
   font-weight: 800;
   box-shadow: 0 4px 0 #2b2a27;
+}
+
+.btn-primary:active {
+  box-shadow: 0 1px 0 #2b2a27;
+  transform: translateY(3px) scale(0.99);
 }
 
 .card {

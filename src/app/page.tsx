@@ -124,8 +124,8 @@ const statusConfig: Record<
     button: "border-[#E4564A] bg-[#FDE9E7] text-[#E4564A]",
   },
   discontinued: {
-    label: "継続購入なし",
-    short: "廃番",
+    label: "補充しない",
+    short: "補充なし",
     chip: "border-[#A49E93] bg-[#F1EFEB] text-[#7A746B]",
     button: "border-[#A49E93] bg-[#F1EFEB] text-[#7A746B]",
   },
@@ -190,7 +190,7 @@ const sampleItems: StockItem[] = [
     category: "飲料",
     icon: "🧃",
     status: "discontinued",
-    note: "廃番。通常一覧では控えめ表示。",
+    note: "補充しないもの。通常一覧では控えめ表示。",
     updatedBy: "パパ",
     updatedAt: "2026.05.20 12:12",
     purchaseLogs: [],
@@ -325,6 +325,7 @@ export default function Home() {
   });
   const [restockId, setRestockId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StockItem | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{ itemId: string; to: ItemStatus } | null>(null);
   const [recentNotifications, setRecentNotifications] = useState<Record<string, number>>({});
   const notificationLocksRef = useRef<Set<string>>(new Set());
   const [form, setForm] = useState({ name: "", category: "調味料" as Category, icon: "🧴", note: "" });
@@ -561,6 +562,7 @@ export default function Home() {
 
   const selectedItem = items.find((item) => item.id === selectedId);
   const restockItem = restockId ? items.find((item) => item.id === restockId) : null;
+  const statusConfirmItem = statusConfirm ? items.find((item) => item.id === statusConfirm.itemId) : null;
 
   const visibleItems = useMemo(() => {
     return items.filter((item) => {
@@ -807,6 +809,23 @@ export default function Home() {
     setToast("");
   }
 
+  function requestStatusChange(itemId: string, to: ItemStatus) {
+    const item = items.find((target) => target.id === itemId);
+    if (!item || item.status === to) return;
+    if (to === "in_stock" && (item.status === "low" || item.status === "out")) {
+      setRestockId(itemId);
+      return;
+    }
+    setStatusConfirm({ itemId, to });
+  }
+
+  async function confirmStatusChange() {
+    if (!statusConfirm) return;
+    const pending = statusConfirm;
+    setStatusConfirm(null);
+    await changeStatus(pending.itemId, pending.to);
+  }
+
   async function changeStatus(itemId: string, to: ItemStatus) {
     if (!supabase || !authUser) return;
     const item = items.find((target) => target.id === itemId);
@@ -1010,7 +1029,7 @@ export default function Home() {
                 setSelectedId(id);
                 requireLogin("detail");
               }}
-              onStatus={changeStatus}
+              onStatus={requestStatusChange}
               onLoadSample={loadSampleData}
             />
           )}
@@ -1021,7 +1040,7 @@ export default function Home() {
               onBack={() => setScreen("stock")}
               onEdit={() => startEdit(selectedItem)}
               onDelete={() => setDeleteTarget(selectedItem)}
-              onStatus={changeStatus}
+              onStatus={requestStatusChange}
               onRestock={() => setRestockId(selectedItem.id)}
             />
           ) : null}
@@ -1059,6 +1078,14 @@ export default function Home() {
         {isLoggedIn && household ? <MobileNav screen={effectiveScreen} go={requireLogin} /> : null}
         {toast ? <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-center text-xs font-bold shadow-[0_10px_30px_rgba(80,60,30,.16)] md:bottom-6">{toast}</div> : null}
         {restockItem ? <RestockModal item={restockItem} onSubmit={restock} onClose={() => setRestockId(null)} /> : null}
+        {statusConfirm && statusConfirmItem ? (
+          <StatusConfirmModal
+            item={statusConfirmItem}
+            to={statusConfirm.to}
+            onConfirm={confirmStatusChange}
+            onClose={() => setStatusConfirm(null)}
+          />
+        ) : null}
         {deleteTarget ? <DeleteConfirmModal item={deleteTarget} onDelete={() => deleteItem(deleteTarget)} onClose={() => setDeleteTarget(null)} /> : null}
       </div>
     </main>
@@ -1394,21 +1421,30 @@ function DetailView({
               <button key={status} onClick={() => onStatus(item.id, status)} className={`rounded-[10px] border-2 py-2 text-[11px] font-extrabold ${item.status === status ? statusConfig[status].button : "border-[#E7DCC6] bg-white text-[#7A746B]"}`}>{statusConfig[status].short}</button>
             ))}
           </div>
-          <button onClick={onRestock} className="btn-primary mt-4 w-full">🛒 補充した</button>
+          <button onClick={onRestock} className="btn-primary mb-5 mt-6 w-full">🛒 補充した</button>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={onEdit} className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold">編集</button>
-            <button onClick={onDelete} className="rounded-full px-4 py-2 text-sm font-extrabold text-[#E4564A]">削除</button>
+            <button onClick={onDelete} className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold text-[#E4564A]">削除</button>
           </div>
         </section>
         <section>
+          <Overline>MEMO</Overline>
+          <h2 className="heading">メモ</h2>
+          <div className="card mb-3">
+            <div className="flex items-center justify-between gap-3">
+              <b>登録メモ</b>
+              <span className="tag">ITEM</span>
+            </div>
+            <p className="meta mt-2 leading-6">{item.note || "登録メモはまだありません。"}</p>
+          </div>
           <Overline>PURCHASE LOG</Overline>
-          <h2 className="heading">購入メモ履歴</h2>
+          <h2 className="heading">補充メモ履歴</h2>
           {item.purchaseLogs.length ? item.purchaseLogs.map((log) => (
             <div key={log.id} className="card mb-3">
               <div className="flex justify-between gap-3"><b>{[log.volume, log.memo].filter(Boolean).join(" / ")}</b><span className="meta font-[var(--font-outfit)]">{log.purchasedAt}</span></div>
               <p className="meta">記録：{log.purchasedBy}</p>
             </div>
-          )) : <p className="note">購入メモはまだありません。</p>}
+          )) : <p className="note">補充時のメモはまだありません。「補充した」から容量や今回買ったものを記録できます。</p>}
         </section>
       </div>
     </div>
@@ -1678,6 +1714,37 @@ function SettingsView({
   );
 }
 
+function StatusConfirmModal({
+  item,
+  to,
+  onConfirm,
+  onClose,
+}: {
+  item: StockItem;
+  to: ItemStatus;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const willNotify = to === "low" || to === "out";
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-[#2B2A27]/40 px-4">
+      <div className="w-full max-w-sm rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
+        <Overline>STATUS</Overline>
+        <h2 className="heading">ステータスを変更しますか？</h2>
+        <p className="text-sm leading-7">
+          <b>{item.name}</b> を <StatusPill status={to} small /> に変更します。
+          {willNotify ? " LINE連携中の場合は、確定後に通知が送信されることがあります。" : ""}
+        </p>
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={onClose} className="min-h-12 flex-1 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">キャンセル</button>
+          <button type="button" onClick={onConfirm} className="btn-primary flex-1">変更する</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeleteConfirmModal({ item, onDelete, onClose }: { item: StockItem; onDelete: () => void; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-[#2B2A27]/40 px-4">
@@ -1703,11 +1770,11 @@ function RestockModal({ item, onSubmit, onClose }: { item: StockItem; onSubmit: 
           <Field label="容量"><input name="volume" className="input" placeholder="例：1L / 3個 / 12ロール" defaultValue={item.lastPurchaseMemo?.split("/")[0]?.trim()} /></Field>
           <Field label="メモ（今回買ったもの）"><input name="memo" className="input" placeholder="今回は詰め替え用を買った" /></Field>
         </div>
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button name="restockMode" value="none" className="min-h-12 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold sm:flex-1" formNoValidate>メモなしで戻す</button>
           <button name="restockMode" value="save" className="btn-primary sm:flex-1">記録して在庫ありに <span className="font-[var(--font-outfit)] text-xs opacity-70">SAVE</span></button>
         </div>
-        <button type="button" onClick={onClose} className="mt-2 w-full rounded-full px-4 py-3 text-sm font-extrabold text-[#7A746B]">キャンセル</button>
+        <button type="button" onClick={onClose} className="mt-5 min-h-12 w-full rounded-full px-4 py-3 text-sm font-extrabold text-[#7A746B]">キャンセル</button>
       </form>
     </div>
   );
