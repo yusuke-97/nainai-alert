@@ -12,6 +12,7 @@ create table if not exists households (
   created_by uuid references auth.users(id) on delete set null,
   line_target_type text check (line_target_type in ('user', 'group')),
   line_target_id text,
+  category_icons jsonb,
   invite_code text unique default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
   created_at timestamptz not null default now()
 );
@@ -77,6 +78,7 @@ alter table status_change_logs enable row level security;
 alter table notifications_log enable row level security;
 
 alter table households add column if not exists created_by uuid references auth.users(id) on delete set null;
+alter table households add column if not exists category_icons jsonb;
 alter table profiles add column if not exists avatar_url text;
 alter table items add column if not exists icon text not null default '🧴';
 alter table notifications_log add column if not exists dedupe_key text;

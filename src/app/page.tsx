@@ -10,8 +10,19 @@ const lineFriendUrl = process.env.NEXT_PUBLIC_LINE_FRIEND_URL ?? "";
 
 type Screen = "login" | "setup" | "stock" | "add" | "detail" | "edit" | "history" | "settings";
 type ItemStatus = "in_stock" | "low" | "out" | "discontinued";
-type Category = "調味料" | "日用品" | "飲料" | "その他";
+type Category = "調味料" | "食料品" | "日用品" | "飲料品" | "その他";
 type Filter = "all" | "needs" | Category;
+type CategoryIcons = Record<Category, string>;
+
+const categories: Category[] = ["調味料", "食料品", "日用品", "飲料品", "その他"];
+const defaultCategoryIcons: CategoryIcons = {
+  調味料: "🧂",
+  食料品: "🥫",
+  日用品: "🧻",
+  飲料品: "🧃",
+  その他: "🧴",
+};
+const categoryIconChoices = ["🧂", "🥫", "🍚", "🍞", "🥛", "🧃", "🧻", "🧽", "🧴", "🫙"];
 
 type StockItem = {
   id: string;
@@ -61,6 +72,7 @@ type HouseholdRow = {
   line_target_type: "user" | "group" | null;
   line_target_id: string | null;
   invite_code: string | null;
+  category_icons: Record<string, string> | null;
 };
 
 type ItemRow = {
@@ -187,7 +199,7 @@ const sampleItems: StockItem[] = [
   {
     id: "tea",
     name: "某メーカー麦茶",
-    category: "飲料",
+    category: "飲料品",
     icon: "🧃",
     status: "discontinued",
     note: "補充しないもの。通常一覧では控えめ表示。",
@@ -282,8 +294,23 @@ function formatDate(value?: string | null) {
 }
 
 function asCategory(value?: string | null): Category {
-  if (value === "調味料" || value === "日用品" || value === "飲料" || value === "その他") return value;
+  if (value === "飲料") return "飲料品";
+  if (categories.includes(value as Category)) return value as Category;
   return "その他";
+}
+
+function normalizeCategoryIcons(value?: Record<string, string> | null): CategoryIcons {
+  return categories.reduce<CategoryIcons>(
+    (acc, category) => {
+      acc[category] = value?.[category] || (category === "飲料品" ? value?.["飲料"] : "") || defaultCategoryIcons[category];
+      return acc;
+    },
+    { ...defaultCategoryIcons },
+  );
+}
+
+function getCategoryIcon(category: Category, icons: CategoryIcons) {
+  return icons[category] || defaultCategoryIcons[category];
 }
 
 function buildLineMessage(status: ItemStatus, item: StockItem) {
@@ -319,6 +346,7 @@ export default function Home() {
   const [toast, setToast] = useState(isSupabaseConfigured ? "" : `${supabaseConfigError}。.env.localを確認してください`);
   const [items, setItems] = useState(initialItems);
   const [logs, setLogs] = useState(initialLogs);
+  const [categoryIcons, setCategoryIcons] = useState<CategoryIcons>(defaultCategoryIcons);
   const [selectedId, setSelectedId] = useState(() => {
     const match = pathname.match(/^\/items\/([^/]+)/);
     return match?.[1] === "new" ? "" : match?.[1] ?? "";
@@ -328,8 +356,8 @@ export default function Home() {
   const [statusConfirm, setStatusConfirm] = useState<{ itemId: string; to: ItemStatus } | null>(null);
   const [recentNotifications, setRecentNotifications] = useState<Record<string, number>>({});
   const notificationLocksRef = useRef<Set<string>>(new Set());
-  const [form, setForm] = useState({ name: "", category: "調味料" as Category, icon: "🧴", note: "" });
-  const [editForm, setEditForm] = useState({ name: "", category: "調味料" as Category, icon: "🧴", note: "" });
+  const [form, setForm] = useState({ name: "", category: "調味料" as Category, note: "" });
+  const [editForm, setEditForm] = useState({ name: "", category: "調味料" as Category, note: "" });
   const isLoggedIn = Boolean(authUser);
   const lineConnected = Boolean(lineTargetId);
 
@@ -385,7 +413,7 @@ export default function Home() {
 
     const { data: householdData, error: householdError } = await supabase
       .from("households")
-      .select("id, name, line_target_type, line_target_id, invite_code")
+      .select("id, name, line_target_type, line_target_id, invite_code, category_icons")
       .eq("id", profile.household_id)
       .single();
 
@@ -400,6 +428,8 @@ export default function Home() {
     setInviteCode(householdRow.invite_code ?? "");
     setLineTargetType(householdRow.line_target_type);
     setLineTargetId(householdRow.line_target_id);
+    const nextCategoryIcons = normalizeCategoryIcons(householdRow.category_icons);
+    setCategoryIcons(nextCategoryIcons);
 
     const [{ data: memberData }, { data: itemData, error: itemError }] = await Promise.all([
       supabase.from("profiles").select("id, display_name, email, avatar_url").eq("household_id", householdRow.id),
@@ -454,7 +484,7 @@ export default function Home() {
       id: item.id,
       name: item.name,
       category: asCategory(item.category),
-      icon: item.icon || "🧴",
+      icon: getCategoryIcon(asCategory(item.category), nextCategoryIcons),
       status: item.status,
       note: item.note ?? "",
       lastPurchaseMemo: item.last_purchase_memo ?? undefined,
@@ -530,6 +560,7 @@ export default function Home() {
         setDisplayNameDraft("");
         setProfileAvatarUrl("");
         setProfileAvatarDraft("");
+        setCategoryIcons(defaultCategoryIcons);
         setItems([]);
         setLogs([]);
         setScreen("login");
@@ -579,7 +610,7 @@ export default function Home() {
         acc[item.category] += 1;
         return acc;
       },
-      { 調味料: 0, 日用品: 0, 飲料: 0, その他: 0 },
+      { 調味料: 0, 食料品: 0, 日用品: 0, 飲料品: 0, その他: 0 },
     );
   }, [items]);
 
@@ -708,7 +739,7 @@ export default function Home() {
     const { data: householdData, error: householdError } = await supabase
       .from("households")
       .insert({ name, created_by: authUser.id })
-      .select("id, name, line_target_type, line_target_id, invite_code")
+      .select("id, name, line_target_type, line_target_id, invite_code, category_icons")
       .single();
 
     if (householdError) {
@@ -742,7 +773,7 @@ export default function Home() {
       household_id: householdId,
       name: form.name.trim(),
       category: form.category,
-      icon: form.icon,
+      icon: getCategoryIcon(form.category, categoryIcons),
       status: "in_stock",
       note: form.note,
       updated_by: authUser.id,
@@ -754,7 +785,7 @@ export default function Home() {
     }
 
     await loadHouseholdData(authUser);
-    setForm({ name: "", category: "調味料", icon: "🧴", note: "" });
+    setForm({ name: "", category: "調味料", note: "" });
     setScreen("stock");
     setToast("");
   }
@@ -768,7 +799,7 @@ export default function Home() {
 
   function startEdit(item: StockItem) {
     setSelectedId(item.id);
-    setEditForm({ name: item.name, category: item.category, icon: item.icon, note: item.note });
+    setEditForm({ name: item.name, category: item.category, note: item.note });
     setScreen("edit");
   }
 
@@ -787,7 +818,7 @@ export default function Home() {
       .update({
         name: editForm.name.trim(),
         category: editForm.category,
-        icon: editForm.icon,
+        icon: getCategoryIcon(editForm.category, categoryIcons),
         note: editForm.note,
         updated_by: authUser.id,
         updated_at: new Date().toISOString(),
@@ -985,6 +1016,25 @@ export default function Home() {
     setToast("");
   }
 
+  async function saveCategoryIcons(nextIcons: CategoryIcons) {
+    if (!supabase || !householdId) return;
+    const normalized = normalizeCategoryIcons(nextIcons);
+    const { error } = await supabase.from("households").update({ category_icons: normalized }).eq("id", householdId);
+    if (error) {
+      setToast(`カテゴリ別アイコンの保存に失敗しました: ${error.message}`);
+      return;
+    }
+
+    setCategoryIcons(normalized);
+    setItems((current) =>
+      current.map((item) => ({
+        ...item,
+        icon: getCategoryIcon(item.category, normalized),
+      })),
+    );
+    setToast("");
+  }
+
   async function setLineConnected(connected: boolean) {
     if (!supabase || !householdId) return;
     if (!connected) {
@@ -1076,11 +1126,13 @@ export default function Home() {
               setDisplayNameDraft={setDisplayNameDraft}
               profileAvatarDraft={profileAvatarDraft}
               setProfileAvatarDraft={setProfileAvatarDraft}
+              categoryIcons={categoryIcons}
               lineConnected={lineConnected}
               lineTargetType={lineTargetType}
               lineFriendUrl={lineFriendUrl}
               setLineConnected={setLineConnected}
               onSaveDisplayName={saveDisplayName}
+              onSaveCategoryIcons={saveCategoryIcons}
               onLogout={logout}
             />
           )}
@@ -1290,7 +1342,7 @@ function StockView(props: {
         <div className="flex flex-wrap gap-2 md:ml-auto md:justify-end">
           <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて ({props.totalCount})</FilterChip>
           <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 ({props.needCount})</FilterChip>
-          {(["調味料", "日用品", "飲料", "その他"] as Category[]).map((category) => (
+          {categories.map((category) => (
             <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category} ({props.categoryCounts[category]})</FilterChip>
           ))}
         </div>
@@ -1354,8 +1406,8 @@ function AddItemView({
   onSubmit,
   onCancel,
 }: {
-  form: { name: string; category: Category; icon: string; note: string };
-  setForm: (form: { name: string; category: Category; icon: string; note: string }) => void;
+  form: { name: string; category: Category; note: string };
+  setForm: (form: { name: string; category: Category; note: string }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
@@ -1366,35 +1418,13 @@ function AddItemView({
       <Field label="アイテム名（自由入力 / 銘柄でも用途でもOK）">
         <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例：キッコーマン 特選丸大豆しょうゆ" />
       </Field>
-      <div className="md:flex md:items-start md:gap-4">
-        <Field label="カテゴリ">
-          <div className="flex flex-wrap gap-2">
-            {(["調味料", "日用品", "飲料", "その他"] as Category[]).map((category) => (
-              <FilterChip key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</FilterChip>
-            ))}
-          </div>
-        </Field>
-        <Field label="アイコン">
-          <div className="flex flex-wrap items-center gap-2">
-            {["🧴", "🧂", "🧻", "🥫", "🧽", "🫙"].map((icon) => (
-              <button
-                type="button"
-                key={icon}
-                onClick={() => setForm({ ...form, icon })}
-                aria-label={`${icon} を選択`}
-                aria-pressed={form.icon === icon}
-                className={`grid size-11 place-items-center rounded-xl border-2 text-[22px] leading-none transition ${
-                  form.icon === icon
-                    ? "border-[#2B2A27] bg-[#FFF1E6] shadow-[0_3px_0_#2B2A27]"
-                    : "border-[#E7DCC6] bg-white hover:border-[#2B2A27] hover:bg-[#FFF7EC]"
-                }`}
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
-        </Field>
-      </div>
+      <Field label="カテゴリ">
+        <div className="flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <FilterChip key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</FilterChip>
+          ))}
+        </div>
+      </Field>
       <Field label="メモ（任意）"><input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="いつも詰め替え用を購入" /></Field>
       <p className="note">登録時のステータスは自動で「在庫あり」になります。</p>
       <div className="mt-4 flex gap-3">
@@ -1471,8 +1501,8 @@ function EditItemView({
   onCancel,
   onDelete,
 }: {
-  form: { name: string; category: Category; icon: string; note: string };
-  setForm: (form: { name: string; category: Category; icon: string; note: string }) => void;
+  form: { name: string; category: Category; note: string };
+  setForm: (form: { name: string; category: Category; note: string }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   onDelete: () => void;
@@ -1486,15 +1516,8 @@ function EditItemView({
       </Field>
       <Field label="カテゴリ">
         <div className="flex flex-wrap gap-2">
-          {(["調味料", "日用品", "飲料", "その他"] as Category[]).map((category) => (
+          {categories.map((category) => (
             <FilterChip key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</FilterChip>
-          ))}
-        </div>
-      </Field>
-      <Field label="アイコン">
-        <div className="flex flex-wrap gap-2">
-          {["🧴", "🧂", "🧻", "🥫", "🧽", "🫙", "🧃"].map((icon) => (
-            <button type="button" key={icon} onClick={() => setForm({ ...form, icon })} className={`grid size-11 place-items-center rounded-xl border-2 text-xl ${form.icon === icon ? "border-[#2B2A27] bg-[#FFF1E6]" : "border-[#E7DCC6] bg-white"}`}>{icon}</button>
           ))}
         </div>
       </Field>
@@ -1550,11 +1573,13 @@ function SettingsView({
   setDisplayNameDraft,
   profileAvatarDraft,
   setProfileAvatarDraft,
+  categoryIcons,
   lineConnected,
   lineTargetType,
   lineFriendUrl,
   setLineConnected,
   onSaveDisplayName,
+  onSaveCategoryIcons,
   onLogout,
 }: {
   household: string;
@@ -1564,14 +1589,17 @@ function SettingsView({
   setDisplayNameDraft: (displayName: string) => void;
   profileAvatarDraft: string;
   setProfileAvatarDraft: (avatarUrl: string) => void;
+  categoryIcons: CategoryIcons;
   lineConnected: boolean;
   lineTargetType: "user" | "group" | null;
   lineFriendUrl: string;
   setLineConnected: (connected: boolean) => void | Promise<void>;
   onSaveDisplayName: (displayName: string, avatarUrl?: string) => void | Promise<void>;
+  onSaveCategoryIcons: (icons: CategoryIcons) => void | Promise<void>;
   onLogout: () => void | Promise<void>;
 }) {
   const lineTargetLabel = lineTargetType === "user" ? "自分のLINE" : `${household} グループ`;
+  const [categoryIconDraft, setCategoryIconDraft] = useState<CategoryIcons>(() => normalizeCategoryIcons(categoryIcons));
 
   function updateAvatar(file: File | null) {
     if (!file) return;
@@ -1653,6 +1681,50 @@ function SettingsView({
             <p>送信後、そのトークまたはグループが通知先として保存されます。</p>
           </div>
           <p className="note">残りわずか・在庫切れのみ通知。自分のLINEまたは1グループに集約し無料枠（月約200通）を節約。</p>
+        </div>
+        <div className="card">
+          <div className="flex gap-3">
+            <Thumb>{categoryIconDraft.その他}</Thumb>
+            <div>
+              <b>カテゴリ別アイコン</b>
+              <p className="meta">アイテムのアイコンはカテゴリごとに設定したものを表示します。</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-4">
+            {categories.map((category) => (
+              <div key={category}>
+                <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
+                  <span className="grid size-9 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-xl">{categoryIconDraft[category]}</span>
+                  {category}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {categoryIconChoices.map((icon) => (
+                    <button
+                      type="button"
+                      key={`${category}-${icon}`}
+                      onClick={() => setCategoryIconDraft({ ...categoryIconDraft, [category]: icon })}
+                      aria-label={`${category} のアイコンを ${icon} にする`}
+                      aria-pressed={categoryIconDraft[category] === icon}
+                      className={`grid size-11 place-items-center rounded-xl border-2 text-xl ${
+                        categoryIconDraft[category] === icon
+                          ? "border-[#2B2A27] bg-[#FFF1E6] shadow-[0_3px_0_#2B2A27]"
+                          : "border-[#E7DCC6] bg-white"
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => onSaveCategoryIcons(categoryIconDraft)}
+            className="btn-primary mt-5 w-full"
+          >
+            カテゴリアイコンを保存
+          </button>
         </div>
         <div className="card">
           <div className="flex gap-3"><Thumb>👨‍👩‍👧</Thumb><div><b>家族メンバー</b><p className="meta">{members.length ? `${members.map((member) => member.displayName).join("・")} の${members.length}名` : "メンバー未取得"}</p></div></div>
