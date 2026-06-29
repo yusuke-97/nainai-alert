@@ -4,6 +4,69 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
+import {
+  ArrowLeft,
+  Apple,
+  Banana,
+  Bath,
+  Bean,
+  Beef,
+  Beer,
+  Bell,
+  Boxes,
+  BottleWine,
+  BrushCleaning,
+  Bubbles,
+  Carrot,
+  Check,
+  ChevronRight,
+  ChefHat,
+  Cherry,
+  ClipboardList,
+  Coffee,
+  CookingPot,
+  Copy,
+  Croissant,
+  CupSoda,
+  Droplet,
+  Drumstick,
+  Egg,
+  Fish,
+  GlassWater,
+  Grape,
+  Ham,
+  History,
+  HomeIcon,
+  ImagePlus,
+  KeyRound,
+  MessageCircle,
+  Milk,
+  Package,
+  PackageOpen,
+  PillBottle,
+  Plus,
+  RotateCcw,
+  Salad,
+  Search,
+  Settings,
+  Shirt,
+  ShoppingBag,
+  ShoppingBasket,
+  ShoppingCart,
+  SoapDispenserDroplet,
+  Soup,
+  Sparkles,
+  SprayCan,
+  Sandwich,
+  Toilet,
+  Trash2,
+  Utensils,
+  UsersRound,
+  WashingMachine,
+  Wheat,
+  Wine,
+  type LucideIcon,
+} from "lucide-react";
 import { isSupabaseConfigured, supabase, supabaseConfigError } from "@/lib/supabase/client";
 
 const lineFriendUrl = process.env.NEXT_PUBLIC_LINE_FRIEND_URL ?? "";
@@ -16,13 +79,120 @@ type CategoryIcons = Record<Category, string>;
 
 const categories: Category[] = ["調味料", "食料品", "日用品", "飲料品", "その他"];
 const defaultCategoryIcons: CategoryIcons = {
-  調味料: "🧂",
-  食料品: "🥫",
-  日用品: "🧻",
-  飲料品: "🧃",
-  その他: "🧴",
+  [categories[0]]: "CookingPot",
+  [categories[1]]: "Carrot",
+  [categories[2]]: "SoapDispenserDroplet",
+  [categories[3]]: "CupSoda",
+  [categories[4]]: "ShoppingBasket",
+} as CategoryIcons;
+const categoryIconChoices: CategoryIcons = {
+  [categories[0]]: ["CookingPot", "Utensils", "Soup", "ChefHat", "PillBottle", "BottleWine", "Droplet"].join(","),
+  [categories[1]]: ["Apple", "Banana", "Carrot", "Fish", "Grape", "Cherry", "Beef", "Egg", "Wheat", "Bean", "Ham", "Drumstick", "Salad", "Sandwich", "Croissant"].join(","),
+  [categories[2]]: ["SoapDispenserDroplet", "SprayCan", "Bubbles", "BrushCleaning", "WashingMachine", "Toilet", "Bath", "Shirt", "Package"].join(","),
+  [categories[3]]: ["CupSoda", "Milk", "GlassWater", "Coffee", "Beer", "Wine", "BottleWine"].join(","),
+  [categories[4]]: ["ShoppingBasket", "Package", "PackageOpen", "Boxes", "ShoppingBag"].join(","),
+} as CategoryIcons;
+
+function getCategoryIconChoices(category: Category) {
+  return categoryIconChoices[category].split(",");
+}
+
+const lucideIcons: Record<string, LucideIcon> = {
+  ArrowLeft,
+  Apple,
+  Banana,
+  Bath,
+  Bean,
+  Beef,
+  Beer,
+  Bell,
+  Boxes,
+  BottleWine,
+  BrushCleaning,
+  Bubbles,
+  Carrot,
+  Check,
+  ChevronRight,
+  ChefHat,
+  Cherry,
+  ClipboardList,
+  Coffee,
+  CookingPot,
+  Copy,
+  Croissant,
+  CupSoda,
+  Droplet,
+  Drumstick,
+  Egg,
+  Fish,
+  GlassWater,
+  Grape,
+  Ham,
+  History,
+  HomeIcon,
+  ImagePlus,
+  KeyRound,
+  MessageCircle,
+  Milk,
+  Package,
+  PackageOpen,
+  PillBottle,
+  Plus,
+  RotateCcw,
+  Salad,
+  Search,
+  Settings,
+  Shirt,
+  ShoppingBag,
+  ShoppingBasket,
+  ShoppingCart,
+  SoapDispenserDroplet,
+  Soup,
+  Sparkles,
+  SprayCan,
+  Sandwich,
+  Toilet,
+  Trash2,
+  Utensils,
+  UsersRound,
+  WashingMachine,
+  Wheat,
+  Wine,
 };
-const categoryIconChoices = ["🧂", "🥫", "🍚", "🍞", "🥛", "🧃", "🧻", "🧽", "🧴", "🫙"];
+
+const legacyIconMap: Record<string, string> = {
+  ["\u{1F9C2}"]: "CookingPot",
+  ["\u{1F96B}"]: "Package",
+  ["\u{1F35A}"]: "Wheat",
+  ["\u{1F35E}"]: "Croissant",
+  ["\u{1F95B}"]: "Milk",
+  ["\u{1F9C3}"]: "CupSoda",
+  ["\u{1F9FB}"]: "Toilet",
+  ["\u{1F9FD}"]: "BrushCleaning",
+  ["\u{1F9F4}"]: "SoapDispenserDroplet",
+  ["\u{1FAD9}"]: "ShoppingBasket",
+  SeasoningBottle: "CookingPot",
+  FoodCan: "Package",
+  RiceBowl: "Wheat",
+  BreadLoaf: "Croissant",
+  DrinkCarton: "Milk",
+  GlassBottle: "CupSoda",
+  DailyGoods: "SoapDispenserDroplet",
+  CleaningSponge: "BrushCleaning",
+  PumpBottle: "SoapDispenserDroplet",
+  StorageJar: "ShoppingBasket",
+};
+
+function normalizeIconName(icon?: string | null) {
+  if (!icon) return "Package";
+  const mappedIcon = legacyIconMap[icon] || icon;
+  return lucideIcons[mappedIcon] ? mappedIcon : "Package";
+}
+
+function AppIcon({ name, className = "size-5", strokeWidth = 2.5 }: { name: string; className?: string; strokeWidth?: number }) {
+  const Icon = lucideIcons[normalizeIconName(name)] ?? Package;
+  return <Icon className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
+}
 
 type StockItem = {
   id: string;
@@ -201,7 +371,7 @@ const sampleItems: StockItem[] = [
     id: "soy",
     name: "キッコーマン 特選丸大豆しょうゆ",
     category: "調味料",
-    icon: "🧴",
+    icon: "CookingPot",
     status: "low",
     note: "いつも丸大豆。詰め替えよりボトル派。",
     lastPurchaseMemo: "1L / いつものを購入",
@@ -216,7 +386,7 @@ const sampleItems: StockItem[] = [
     id: "paper",
     name: "トイレットペーパー",
     category: "日用品",
-    icon: "🧻",
+    icon: "SoapDispenserDroplet",
     status: "out",
     note: "ダブル。芯なしでもOK。",
     lastPurchaseMemo: "12ロール / ダブル",
@@ -230,7 +400,7 @@ const sampleItems: StockItem[] = [
     id: "salt",
     name: "伯方の塩",
     category: "調味料",
-    icon: "🧂",
+    icon: "CookingPot",
     status: "in_stock",
     note: "詰め替え用を優先。",
     lastPurchaseMemo: "1kg / 詰め替え",
@@ -242,7 +412,7 @@ const sampleItems: StockItem[] = [
     id: "sponge",
     name: "食器用スポンジ",
     category: "日用品",
-    icon: "🧽",
+    icon: "BrushCleaning",
     status: "in_stock",
     note: "3個入りの硬め。",
     updatedBy: "ママ",
@@ -253,7 +423,7 @@ const sampleItems: StockItem[] = [
     id: "tea",
     name: "某メーカー麦茶",
     category: "飲料品",
-    icon: "🧃",
+    icon: "Milk",
     status: "discontinued",
     note: "補充しないもの。通常一覧では控えめ表示。",
     updatedBy: "パパ",
@@ -355,7 +525,8 @@ function asCategory(value?: string | null): Category {
 function normalizeCategoryIcons(value?: Record<string, string> | null): CategoryIcons {
   return categories.reduce<CategoryIcons>(
     (acc, category) => {
-      acc[category] = value?.[category] || (category === "飲料品" ? value?.["飲料"] : "") || defaultCategoryIcons[category];
+      const normalizedIcon = normalizeIconName(value?.[category] || (category === "飲料品" ? value?.["飲料"] : "") || defaultCategoryIcons[category]);
+      acc[category] = category === categories[4] && normalizedIcon === "Boxes" ? "ShoppingBasket" : normalizedIcon;
       return acc;
     },
     { ...defaultCategoryIcons },
@@ -363,7 +534,7 @@ function normalizeCategoryIcons(value?: Record<string, string> | null): Category
 }
 
 function getCategoryIcon(category: Category, icons: CategoryIcons) {
-  return icons[category] || defaultCategoryIcons[category];
+  return normalizeIconName(icons[category] || defaultCategoryIcons[category]);
 }
 
 function buildLineMessage(status: ItemStatus, item: StockItem) {
@@ -1288,6 +1459,7 @@ export default function Home() {
               onNotifications={openNotifications}
               onSettings={() => requireLogin("settings")}
             />
+            <div className="h-[73px] md:hidden" aria-hidden="true" />
           </div>
         ) : null}
 
@@ -1303,6 +1475,7 @@ export default function Home() {
               needCount={needCount}
               batchNotifyCount={batchNotifyCount}
               categoryCounts={categoryCounts}
+              categoryIcons={categoryIcons}
               filter={filter}
               setFilter={setFilter}
               onAdd={() => requireLogin("add")}
@@ -1315,7 +1488,7 @@ export default function Home() {
               onLoadSample={loadSampleData}
             />
           )}
-          {effectiveScreen === "add" && <AddItemView form={form} setForm={setForm} onSubmit={addItem} onCancel={() => setScreen("stock")} />}
+          {effectiveScreen === "add" && <AddItemView form={form} setForm={setForm} categoryIcons={categoryIcons} onSubmit={addItem} onCancel={() => setScreen("stock")} />}
           {effectiveScreen === "detail" && selectedItem ? (
             <DetailView
               item={selectedItem}
@@ -1330,6 +1503,7 @@ export default function Home() {
             <EditItemView
               form={editForm}
               setForm={setEditForm}
+              categoryIcons={categoryIcons}
               onSubmit={saveEdit}
               onCancel={() => setScreen("detail")}
               onDelete={() => setDeleteTarget(selectedItem)}
@@ -1414,24 +1588,29 @@ function AppHeader({
   onSettings: () => void;
 }) {
   return (
-    <header className="mb-4 flex items-center gap-3 border-b border-[#E7DCC6] bg-[#FBF6EC] px-4 py-[14px] md:hidden">
-      <LogoMark />
+    <header className="fixed inset-x-0 top-0 z-50 flex items-center gap-3 border-b border-[#E7DCC6] bg-[#FBF6EC] px-4 py-[14px] shadow-[0_6px_18px_rgba(80,60,30,0.08)] md:hidden">
+      <LogoMark imageScale="scale-[1.4]" />
       <div>
         <p className="font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em]">NaiNai Alert<span className="text-[#E0734D]">.</span></p>
         <p className="mt-1 text-[11px] font-bold text-[#7A746B]">{household || "家族の在庫を、ひとつの場所で。"}</p>
       </div>
       {isLoggedIn ? (
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={onSettings} className="rounded-xl border-2 border-[#2B2A27] bg-white px-3 py-2 font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em]">
-            {lineConnected ? "LINE連携済み" : "LINE未連携"}
+          <button
+            onClick={onSettings}
+            className={`rounded-xl border-2 px-3 py-2 font-[var(--font-outfit)] text-base font-extrabold leading-none tracking-[.04em] ${
+              lineConnected ? "border-[#05A648] bg-[#06C755] text-white" : "border-[#2B2A27] bg-white text-[#33312E]"
+            }`}
+          >
+            {lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "LINE未連携"}
           </button>
           <button
             type="button"
             onClick={onNotifications}
             aria-label={`通知 ${unreadNotificationCount}件`}
-            className="relative grid size-10 place-items-center rounded-xl border-2 border-[#2B2A27] bg-white text-lg font-extrabold"
+            className="relative grid size-10 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#E0734D] text-lg font-extrabold text-white"
           >
-            🔔
+            <Bell className="size-5" strokeWidth={2.5} aria-hidden="true" />
             {unreadNotificationCount ? (
               <span className="absolute -right-2 -top-2 grid min-w-5 place-items-center rounded-full border-2 border-white bg-[#E4564A] px-1 text-[10px] font-black leading-4 text-white">
                 {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
@@ -1446,10 +1625,10 @@ function AppHeader({
 
 function DesktopShell({ screen, go, household, displayName, avatarUrl }: { screen: Screen; go: (screen: Screen) => void; household: string; displayName: string; avatarUrl: string }) {
   const nav = [
-    ["stock", "📋", "在庫一覧"],
-    ["add", "➕", "アイテム登録"],
-    ["history", "🕒", "変更履歴"],
-    ["settings", "⚙️", "設定 / LINE"],
+    ["stock", "ClipboardList", "在庫一覧"],
+    ["add", "Plus", "アイテム登録"],
+    ["history", "History", "変更履歴"],
+    ["settings", "Settings", "設定 / LINE"],
   ] as const;
 
   return (
@@ -1466,7 +1645,7 @@ function DesktopShell({ screen, go, household, displayName, avatarUrl }: { scree
               screen === id ? "border border-[#E0734D] bg-[#FFF1E6] text-[#C75B38]" : "text-[#7A746B]"
             }`}
           >
-            <span>{icon}</span>
+            <AppIcon name={icon} className="size-4 shrink-0" />
             {label}
           </button>
         ))}
@@ -1552,7 +1731,7 @@ function LoginView({
             onClick={() => setMode((current) => (current === "login" ? "signup" : "login"))}
             className="mt-6 text-[11px] font-extrabold text-[#C75B38]"
           >
-            {mode === "login" ? "はじめての方はこちら →" : "アカウントをお持ちの方はこちら →"}
+            {mode === "login" ? "はじめての方はこちら" : "アカウントをお持ちの方はこちら"}
           </button>
         </form>
       </section>
@@ -1567,12 +1746,12 @@ function SetupView({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>)
       <h1 className="heading md:text-2xl">世帯をセットアップ</h1>
       <div className="grid gap-5 md:grid-cols-2">
         <div className="card">
-          <div className="flex gap-3"><Thumb>🏠</Thumb><div><b>新しい世帯をつくる</b><p className="meta">あなたが管理者になります</p></div></div>
+          <div className="flex gap-3"><Thumb>HomeIcon</Thumb><div><b>新しい世帯をつくる</b><p className="meta">あなたが管理者になります</p></div></div>
           <Field label="世帯名"><input name="household" className="input" placeholder="例：山田家" /></Field>
           <button name="setupAction" value="create" className="btn-primary w-full">つくる <span className="font-[var(--font-outfit)] text-xs opacity-70">CREATE</span></button>
         </div>
         <div className="card">
-          <div className="flex gap-3"><Thumb>🔑</Thumb><div><b>招待コードで参加</b><p className="meta">家族から共有されたコードを入力</p></div></div>
+          <div className="flex gap-3"><Thumb>KeyRound</Thumb><div><b>招待コードで参加</b><p className="meta">家族から共有されたコードを入力</p></div></div>
           <Field label="招待コード"><input name="inviteCode" className="input font-[var(--font-outfit)] tracking-[.16em]" placeholder="ABCD-1234" /></Field>
           <button name="setupAction" value="join" className="min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">参加する <span className="font-[var(--font-outfit)] text-xs opacity-60">JOIN</span></button>
         </div>
@@ -1588,6 +1767,7 @@ function StockView(props: {
   needCount: number;
   batchNotifyCount: number;
   categoryCounts: Record<Category, number>;
+  categoryIcons: CategoryIcons;
   filter: Filter;
   setFilter: (filter: Filter) => void;
   onAdd: () => void;
@@ -1607,7 +1787,10 @@ function StockView(props: {
           <FilterChip active={props.filter === "all"} onClick={() => props.setFilter("all")}>すべて ({props.totalCount})</FilterChip>
           <FilterChip active={props.filter === "needs"} onClick={() => props.setFilter("needs")}>要購入 ({props.needCount})</FilterChip>
           {categories.map((category) => (
-            <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>{category} ({props.categoryCounts[category]})</FilterChip>
+            <FilterChip key={category} active={props.filter === category} onClick={() => props.setFilter(category)}>
+              <AppIcon name={getCategoryIcon(category, props.categoryIcons)} className="size-3.5" />
+              {category} ({props.categoryCounts[category]})
+            </FilterChip>
           ))}
         </div>
         <div className="grid gap-3 md:w-auto">
@@ -1615,9 +1798,10 @@ function StockView(props: {
             type="button"
             onClick={props.onBatchNotify}
             disabled={!props.batchNotifyCount}
-            className="min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold disabled:border-[#D8CCB7] disabled:bg-[#F5EFE2] disabled:text-[#9A9183] md:w-auto"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold disabled:border-[#D8CCB7] disabled:bg-[#F5EFE2] disabled:text-[#9A9183] md:w-auto"
           >
-            🛒 購入品をまとめて通知 ({props.batchNotifyCount})
+            <ShoppingCart className="size-4" strokeWidth={2.5} aria-hidden="true" />
+            購入品をまとめて通知 ({props.batchNotifyCount})
           </button>
           <button onClick={props.onAdd} className="btn-primary mt-1 w-full shrink-0 px-5 py-2.5 md:mt-0 md:w-auto">➕ 追加</button>
         </div>
@@ -1629,7 +1813,9 @@ function StockView(props: {
       </div>
       {!props.items.length ? (
         <div className="card mx-auto mt-8 max-w-xl text-center">
-          <div className="mx-auto mb-3 grid size-16 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-3xl">🧺</div>
+          <div className="mx-auto mb-3 grid size-16 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
+            <PackageOpen className="size-8" strokeWidth={2.5} aria-hidden="true" />
+          </div>
           <h2 className="text-lg font-black">まだアイテムがありません</h2>
           <p className="meta mt-2 leading-6">初回利用時は空の在庫一覧から始まります。管理したい日用品や調味料を追加してください。</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -1649,15 +1835,17 @@ function ItemCard({ item, onDetail, onStatus }: { item: StockItem; onDetail: (id
         <Thumb>{item.icon}</Thumb>
         <div className="min-w-0 flex-1">
           <h2 className="line-clamp-2 text-[15px] font-extrabold leading-snug">{item.name}</h2>
-          <p className="meta mt-1">
-            <span className="tag">{item.category}</span> {item.lastPurchaseMemo || item.note || "購入メモ未登録"} ・ 更新{" "}
-            <span className="inline-flex items-center gap-1 align-middle">
+          <div className="meta mt-1 space-y-1">
+            <p><span className="tag">{item.category}</span> {item.lastPurchaseMemo || item.note || "購入メモ未登録"}</p>
+            <p>
+              <span className="tag">更新</span>{" "}
+              <span className="inline-flex items-center gap-1 align-middle">
               <Avatar name={item.updatedBy} avatarUrl={item.updatedByAvatarUrl} size="xs" />
               {item.updatedBy}
-            </span>
-          </p>
+              </span>
+            </p>
+          </div>
         </div>
-        <StatusPill status={item.status} />
       </button>
       <div className="mt-3 grid grid-cols-3 gap-[7px]">
         {(["in_stock", "low", "out"] as ItemStatus[]).map((status) => (
@@ -1677,11 +1865,13 @@ function ItemCard({ item, onDetail, onStatus }: { item: StockItem; onDetail: (id
 function AddItemView({
   form,
   setForm,
+  categoryIcons,
   onSubmit,
   onCancel,
 }: {
   form: { name: string; category: Category; note: string };
   setForm: (form: { name: string; category: Category; note: string }) => void;
+  categoryIcons: CategoryIcons;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
@@ -1695,7 +1885,10 @@ function AddItemView({
       <Field label="カテゴリ">
         <div className="flex flex-wrap gap-x-3 gap-y-6">
           {categories.map((category) => (
-            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</CategoryButton>
+            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>
+              <AppIcon name={getCategoryIcon(category, categoryIcons)} className="size-4" />
+              {category}
+            </CategoryButton>
           ))}
         </div>
       </Field>
@@ -1726,10 +1919,12 @@ function DetailView({
 }) {
   return (
     <div className="mx-auto w-full max-w-4xl pb-20 md:pb-6">
-      <button onClick={onBack} className="mb-4 min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold">← 戻る</button>
+      <button onClick={onBack} className="mb-4 min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold"><ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />戻る</button>
       <div className="grid gap-6 md:grid-cols-[320px_1fr]">
         <section className="card text-center">
-          <div className="text-6xl">{item.icon}</div>
+          <div className="mx-auto grid size-20 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
+            <AppIcon name={item.icon} className="size-10" />
+          </div>
           <h1 className="mt-2 text-xl font-black">{item.name}</h1>
           <p className="meta mt-1"><span className="tag">{item.category}</span> {item.note}</p>
           <div className="my-3"><StatusPill status={item.status} /></div>
@@ -1738,7 +1933,10 @@ function DetailView({
               <button key={status} onClick={() => onStatus(item.id, status)} className={`rounded-[10px] border-2 py-2 text-[11px] font-extrabold ${item.status === status ? statusConfig[status].button : "border-[#E7DCC6] bg-white text-[#7A746B]"}`}>{statusConfig[status].short}</button>
             ))}
           </div>
-          <button onClick={onRestock} className="btn-primary mb-5 mt-6 w-full">🛒 補充した</button>
+          <button onClick={onRestock} className="btn-primary mb-5 mt-6 inline-flex w-full items-center justify-center gap-2">
+            <ShoppingCart className="size-4" strokeWidth={2.5} aria-hidden="true" />
+            補充した
+          </button>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={onEdit} className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold">編集</button>
             <button onClick={onDelete} className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold text-[#E4564A]">削除</button>
@@ -1771,12 +1969,14 @@ function DetailView({
 function EditItemView({
   form,
   setForm,
+  categoryIcons,
   onSubmit,
   onCancel,
   onDelete,
 }: {
   form: { name: string; category: Category; note: string };
   setForm: (form: { name: string; category: Category; note: string }) => void;
+  categoryIcons: CategoryIcons;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   onDelete: () => void;
@@ -1791,7 +1991,10 @@ function EditItemView({
       <Field label="カテゴリ">
         <div className="flex flex-wrap gap-x-3 gap-y-6">
           {categories.map((category) => (
-            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>{category}</CategoryButton>
+            <CategoryButton key={category} active={form.category === category} onClick={() => setForm({ ...form, category })}>
+              <AppIcon name={getCategoryIcon(category, categoryIcons)} className="size-4" />
+              {category}
+            </CategoryButton>
           ))}
         </div>
       </Field>
@@ -1859,7 +2062,7 @@ function HistoryHubView({
     return (
       <section className="w-full max-w-3xl pb-20 md:pb-6">
         <button type="button" onClick={() => setView("menu")} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
-          ← 履歴に戻る
+          <ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />履歴に戻る
         </button>
         <Overline>ACTIVITY</Overline>
         <h1 className="heading">変更履歴</h1>
@@ -1883,7 +2086,7 @@ function HistoryHubView({
     return (
       <section className="w-full max-w-3xl pb-20 md:pb-6">
         <button type="button" onClick={() => setView("menu")} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
-          ← 履歴に戻る
+          <ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />履歴に戻る
         </button>
         <Overline>SHOPPING NOTICE</Overline>
         <h1 className="heading">通知履歴</h1>
@@ -1916,8 +2119,8 @@ function HistoryHubView({
       <Overline>HISTORY</Overline>
       <h1 className="heading">履歴</h1>
       <div className="grid gap-4">
-        <SettingsMenuButton icon="🕘" title="変更履歴" meta={`${logs.length}件`} onClick={() => setView("changes")} />
-        <SettingsMenuButton icon="🛒" title="通知履歴" meta={`未解決 ${unresolvedCount}件 / 全${shoppingNotifications.length}件`} onClick={() => setView("shopping")} />
+        <SettingsMenuButton icon="History" title="変更履歴" meta={`${logs.length}件`} onClick={() => setView("changes")} />
+        <SettingsMenuButton icon="ShoppingCart" title="通知履歴" meta={`未解決 ${unresolvedCount}件 / 全${shoppingNotifications.length}件`} onClick={() => setView("shopping")} />
       </div>
     </section>
   );
@@ -1953,7 +2156,7 @@ function ShoppingNotificationDetail({
   return (
     <section className="w-full max-w-3xl pb-20 md:pb-6">
       <button type="button" onClick={onBack} className="mb-4 min-h-11 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-2 text-sm font-extrabold">
-        ← 通知履歴に戻る
+        <ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />通知履歴に戻る
       </button>
       <Overline>SHOPPING NOTICE</Overline>
       <h1 className="heading">購入通知の詳細</h1>
@@ -2023,7 +2226,9 @@ function ShoppingNotificationDetail({
 function MissingItemView({ onBack }: { onBack: () => void }) {
   return (
     <section className="card mx-auto w-full max-w-lg text-center">
-      <div className="mx-auto mb-3 grid size-16 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-3xl">🔎</div>
+      <div className="mx-auto mb-3 grid size-16 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
+        <Search className="size-8" strokeWidth={2.5} aria-hidden="true" />
+      </div>
       <Overline>NOT FOUND</Overline>
       <h1 className="heading">アイテムが見つかりません</h1>
       <p className="meta leading-6">削除済み、または現在の世帯に存在しないアイテムです。在庫一覧から対象を選び直してください。</p>
@@ -2096,7 +2301,7 @@ function SettingsView({
         onClick={() => setSettingsSection("menu")}
         className="min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold"
       >
-        ← 設定へ戻る
+        <ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />設定へ戻る
       </button>
     </div>
   );
@@ -2108,19 +2313,19 @@ function SettingsView({
         <h1 className="heading">設定</h1>
         <div className="space-y-3">
           <SettingsMenuButton
-            icon="💬"
+            icon="MessageCircle"
             title="LINE通知"
-            meta={lineConnected ? "連携済み" : "未連携"}
+            meta={lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "未連携"}
             onClick={() => setSettingsSection("line")}
           />
           <SettingsMenuButton
-            icon={categoryIconDraft.その他}
+            icon="Apple"
             title="カテゴリ別アイコン"
             meta="カテゴリごとの表示アイコンを設定"
             onClick={() => setSettingsSection("icons")}
           />
           <SettingsMenuButton
-            icon="👨‍👩‍👧"
+            icon="Boxes"
             title="家族メンバー"
             meta={members.length ? `${members.length}名` : "メンバー未取得"}
             onClick={() => setSettingsSection("members")}
@@ -2138,7 +2343,7 @@ function SettingsView({
         <Overline>SETTINGS</Overline>
         <h1 className="heading">LINE通知</h1>
         <div className="card">
-          <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
+          <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-[#05a648]"><MessageCircle className="size-6" strokeWidth={2.5} aria-hidden="true" /></span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "未連携"}</p></div></div>
           <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
           <button
             onClick={() => {
@@ -2154,7 +2359,7 @@ function SettingsView({
             }}
             className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]"
           >
-            {lineConnected ? "連携しなおす" : "友だち追加 / 連携する"}
+            {lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "友だち追加 / 連携する"}
           </button>
           <div className="mt-7 grid gap-6 sm:grid-cols-2">
             {lineFriendUrl ? (
@@ -2205,7 +2410,7 @@ function SettingsView({
         <h1 className="heading">カテゴリ別アイコン</h1>
         <div className="card">
           <div className="flex gap-3">
-            <Thumb>{categoryIconDraft.その他}</Thumb>
+            <Thumb>Apple</Thumb>
             <div>
               <b>カテゴリ別アイコン</b>
               <p className="meta">アイテムのアイコンはカテゴリごとに設定したものを表示します。</p>
@@ -2215,11 +2420,11 @@ function SettingsView({
             {categories.map((category) => (
               <div key={category}>
                 <div className="mb-4 flex items-center gap-2 text-sm font-extrabold">
-                  <span className="grid size-12 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">{categoryIconDraft[category]}</span>
+                  <span className="grid size-12 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]"><AppIcon name={categoryIconDraft[category]} className="size-6" /></span>
                   {category}
                 </div>
                 <div className="flex flex-wrap gap-x-5 gap-y-7">
-                  {categoryIconChoices.map((icon) => (
+                  {getCategoryIconChoices(category).map((icon) => (
                     <button
                       type="button"
                       key={`${category}-${icon}`}
@@ -2232,7 +2437,7 @@ function SettingsView({
                           : "border-[#E7DCC6] bg-white"
                       }`}
                     >
-                      <span className="block scale-[1.7] leading-none">{icon}</span>
+                      <AppIcon name={icon} className="size-8" />
                     </button>
                   ))}
                 </div>
@@ -2258,7 +2463,7 @@ function SettingsView({
       <h1 className="heading">家族メンバー</h1>
       <div className="grid gap-5 md:grid-cols-2">
         <div className="hidden">
-          <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-2xl">💬</span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? "✓ 連携済み" : "未連携"}</p></div></div>
+          <div className="flex gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#05a648] bg-[#E7FBEE] text-[#05a648]"><MessageCircle className="size-6" strokeWidth={2.5} aria-hidden="true" /></span><div><b>LINE通知</b><p className={`meta font-bold ${lineConnected ? "text-[#4F9D69]" : "text-[#E4564A]"}`}>{lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "未連携"}</p></div></div>
           <p className="meta mt-4">通知先：{lineConnected ? lineTargetLabel : "未設定"}</p>
           <button
             onClick={() => {
@@ -2274,7 +2479,7 @@ function SettingsView({
             }}
             className="mt-4 min-h-12 w-full rounded-full border-2 border-[#05a648] bg-[#06C755] px-5 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_#05a648]"
           >
-            {lineConnected ? "連携しなおす" : "友だち追加 / 連携する"}
+            {lineConnected ? <><Check className="mr-1 inline size-3.5" strokeWidth={3} aria-hidden="true" />連携済み</> : "友だち追加 / 連携する"}
           </button>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {lineFriendUrl ? (
@@ -2325,11 +2530,11 @@ function SettingsView({
             {categories.map((category) => (
               <div key={category}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
-                  <span className="grid size-9 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-xl">{categoryIconDraft[category]}</span>
+                  <span className="grid size-9 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]"><AppIcon name={categoryIconDraft[category]} className="size-5" /></span>
                   {category}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {categoryIconChoices.map((icon) => (
+                  {getCategoryIconChoices(category).map((icon) => (
                     <button
                       type="button"
                       key={`${category}-${icon}`}
@@ -2358,7 +2563,7 @@ function SettingsView({
           </button>
         </div>
         <div className="card">
-          <div className="flex gap-3"><Thumb>👨‍👩‍👧</Thumb><div><b>家族メンバー</b><p className="meta">{members.length ? `${members.map((member) => member.displayName).join("・")} の${members.length}名` : "メンバー未取得"}</p></div></div>
+          <div className="flex gap-3"><Thumb>UsersRound</Thumb><div><b>家族メンバー</b><p className="meta">{members.length ? `${members.map((member) => member.displayName).join("・")} の${members.length}名` : "メンバー未取得"}</p></div></div>
           <div className="mt-[14px]">
             <label className="block text-left text-[12.5px] font-extrabold leading-relaxed">あなたの表示名</label>
             <div className="mt-[6px] flex items-center gap-3">
@@ -2404,8 +2609,7 @@ function SettingsView({
               onClick={() => navigator.clipboard?.writeText(inviteCode)}
               disabled={!inviteCode}
               className="mt-4 min-h-12 w-full rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold"
-            >
-              📋 LINE連携コードをコピー
+            ><Copy className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />LINE連携コードをコピー
             </button>
           </div>
           <div className="mt-5 border-t border-[#E7DCC6] pt-4">
@@ -2503,7 +2707,7 @@ function NotificationPanel({
     <div className="fixed inset-0 z-40 bg-[#2B2A27]/35 px-4 py-5">
       <section className="ml-auto flex h-full w-full max-w-md flex-col rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
         <div className="mb-4 flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">🔔</div>
+          <div className="grid size-11 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]"><Bell className="size-5" strokeWidth={2.5} aria-hidden="true" /></div>
           <div className="min-w-0 flex-1">
             <Overline>NOTICE</Overline>
             <h2 className="text-lg font-black">お知らせ</h2>
@@ -2554,7 +2758,7 @@ function SettingsMenuButton({
 }: {
   icon: string;
   title: string;
-  meta: string;
+  meta: React.ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -2563,12 +2767,14 @@ function SettingsMenuButton({
       onClick={onClick}
       className="flex min-h-20 w-full items-center gap-3 rounded-[16px] border-2 border-[#2B2A27] bg-white p-4 text-left shadow-[0_4px_14px_rgba(80,60,30,0.08)]"
     >
-      <span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-2xl">{icon}</span>
+      <span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
+        <AppIcon name={icon} className="size-6" />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block text-base font-black">{title}</span>
         <span className="meta mt-1 block">{meta}</span>
       </span>
-      <span className="text-lg font-black text-[#7A746B]">›</span>
+      <ChevronRight className="size-5 shrink-0 text-[#7A746B]" strokeWidth={2.5} aria-hidden="true" />
     </button>
   );
 }
@@ -2593,7 +2799,7 @@ function RestockModal({ item, onSubmit, onClose }: { item: StockItem; onSubmit: 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-[#2B2A27]/40 px-4">
       <form onSubmit={onSubmit} className="w-full max-w-[520px] rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
-        <div className="mb-4 flex items-center gap-3"><div className="text-4xl">🛒</div><div><Overline>RESTOCK</Overline><h2 className="text-lg font-black">補充メモを残す</h2><p className="meta">{item.name} → 在庫あり</p></div></div>
+        <div className="mb-4 flex items-center gap-3"><div className="grid size-12 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]"><ShoppingCart className="size-6" strokeWidth={2.5} aria-hidden="true" /></div><div><Overline>RESTOCK</Overline><h2 className="text-lg font-black">補充メモを残す</h2><p className="meta">{item.name} から 在庫あり</p></div></div>
         <div className="md:flex md:gap-4">
           <Field label="容量"><input name="volume" className="input" placeholder="例：1L / 3個 / 12ロール" defaultValue={item.lastPurchaseMemo?.split("/")[0]?.trim()} /></Field>
           <Field label="メモ（今回買ったもの）"><input name="memo" className="input" placeholder="今回は詰め替え用を買った" /></Field>
@@ -2610,15 +2816,15 @@ function RestockModal({ item, onSubmit, onClose }: { item: StockItem; onSubmit: 
 
 function MobileNav({ screen, go }: { screen: Screen; go: (screen: Screen) => void }) {
   const nav = [
-    ["stock", "📋", "在庫"],
-    ["add", "➕", "追加"],
-    ["history", "🕒", "履歴"],
-    ["settings", "⚙️", "設定"],
+    ["stock", "ClipboardList", "在庫"],
+    ["add", "Plus", "追加"],
+    ["history", "History", "履歴"],
+    ["settings", "Settings", "設定"],
   ] as const;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[#E7DCC6] bg-white md:hidden">
       {nav.map(([id, icon, label]) => (
-        <button key={id} onClick={() => go(id)} className={`py-2 text-center text-[10px] font-extrabold ${screen === id ? "text-[#E0734D]" : "text-[#7A746B]"}`}><span className="block text-lg">{icon}</span>{label}</button>
+        <button key={id} onClick={() => go(id)} className={`py-2 text-center text-[10px] font-extrabold ${screen === id ? "text-[#E0734D]" : "text-[#7A746B]"}`}><AppIcon name={icon} className="mx-auto mb-1 size-5" />{label}</button>
       ))}
     </nav>
   );
@@ -2633,7 +2839,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`shrink-0 rounded-full border-2 border-[#2B2A27] px-4 py-1.5 text-xs font-extrabold ${active ? "bg-[#33312E] text-white" : "bg-white text-[#33312E]"}`}>{children}</button>;
+  return <button type="button" onClick={onClick} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 border-[#2B2A27] px-4 py-1.5 text-xs font-extrabold ${active ? "bg-[#33312E] text-white" : "bg-white text-[#33312E]"}`}>{children}</button>;
 }
 
 function CategoryButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -2641,7 +2847,7 @@ function CategoryButton({ active, onClick, children }: { active: boolean; onClic
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-12 min-w-[112px] rounded-full border-2 border-[#2B2A27] px-5 py-3 text-sm font-extrabold ${
+      className={`inline-flex min-h-12 min-w-[112px] items-center justify-center gap-2 rounded-full border-2 border-[#2B2A27] px-5 py-3 text-sm font-extrabold ${
         active ? "bg-[#33312E] text-white" : "bg-white text-[#33312E]"
       }`}
     >
@@ -2675,10 +2881,14 @@ function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl?: st
 }
 
 function Thumb({ children }: { children: React.ReactNode }) {
-  return <span className="grid size-14 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-3xl">{children}</span>;
+  return (
+    <span className="grid size-14 shrink-0 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
+      {typeof children === "string" ? <AppIcon name={children} className="size-7" /> : children}
+    </span>
+  );
 }
 
-function LogoMark({ small = false, large = false, hero = false }: { small?: boolean; large?: boolean; hero?: boolean }) {
+function LogoMark({ small = false, large = false, hero = false, imageScale = "" }: { small?: boolean; large?: boolean; hero?: boolean; imageScale?: string }) {
   return (
     <span
       className={`grid shrink-0 place-items-center ${
@@ -2686,7 +2896,7 @@ function LogoMark({ small = false, large = false, hero = false }: { small?: bool
       }`}
       aria-hidden="true"
     >
-      <Image src="/nainai-alert-logo.svg" alt="" width={512} height={512} className="size-full" priority={hero} />
+      <Image src="/nainai-alert-logo.svg" alt="" width={512} height={512} className={`size-full ${imageScale}`} priority={hero} />
     </span>
   );
 }

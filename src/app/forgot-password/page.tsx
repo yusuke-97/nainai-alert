@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { supabase, supabaseConfigError } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
@@ -59,8 +60,9 @@ export default function ForgotPasswordPage() {
         <button disabled={sending || sent} className="btn-primary mt-4 w-full disabled:opacity-50">
           {sent ? "送信済み" : sending ? "送信中..." : "再設定メールを送信"} <span className="font-[var(--font-outfit)] text-xs opacity-70">SEND</span>
         </button>
-        <Link href="/login" className="mt-5 block text-center text-[11px] font-extrabold text-[#C75B38]">
-          ログイン画面に戻る →
+        <Link href="/login" className="mt-5 inline-flex w-full items-center justify-center gap-1 text-center text-[11px] font-extrabold text-[#C75B38]">
+          ログイン画面に戻る
+          <ChevronRight className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
         </Link>
       </form>
     </main>
