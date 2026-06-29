@@ -2704,7 +2704,7 @@ function NotificationPanel({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-40 bg-[#2B2A27]/35 px-4 py-5">
+    <div className="fixed inset-0 z-[70] bg-[#2B2A27]/35 px-4 py-5">
       <section className="ml-auto flex h-full w-full max-w-md flex-col rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
         <div className="mb-4 flex items-center gap-3">
           <div className="grid size-11 place-items-center rounded-xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]"><Bell className="size-5" strokeWidth={2.5} aria-hidden="true" /></div>
