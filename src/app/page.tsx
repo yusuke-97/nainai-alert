@@ -205,6 +205,9 @@ type StockItem = {
   updatedBy: string;
   updatedByAvatarUrl?: string;
   updatedAt: string;
+  updatedAtRaw: string;
+  createdAt: string;
+  createdAtRaw: string;
   purchaseLogs: PurchaseLog[];
 };
 
@@ -213,7 +216,9 @@ type PurchaseLog = {
   volume: string;
   memo: string;
   purchasedBy: string;
+  purchasedByAvatarUrl?: string;
   purchasedAt: string;
+  purchasedAtRaw: string;
 };
 
 type ActivityLog = {
@@ -291,6 +296,7 @@ type ItemRow = {
   last_purchase_memo: string | null;
   updated_by: string | null;
   updated_at: string;
+  created_at: string;
 };
 
 type PurchaseLogRow = {
@@ -365,95 +371,6 @@ const statusConfig: Record<
     button: "border-[#A49E93] bg-[#F1EFEB] text-[#7A746B]",
   },
 };
-
-const sampleItems: StockItem[] = [
-  {
-    id: "soy",
-    name: "キッコーマン 特選丸大豆しょうゆ",
-    category: "調味料",
-    icon: "CookingPot",
-    status: "low",
-    note: "いつも丸大豆。詰め替えよりボトル派。",
-    lastPurchaseMemo: "1L / いつものを購入",
-    updatedBy: "ママ",
-    updatedAt: "2026.05.30 09:15",
-    purchaseLogs: [
-      { id: "p1", volume: "1L", memo: "いつものを購入", purchasedBy: "ママ", purchasedAt: "2026.05.30" },
-      { id: "p2", volume: "500ml", memo: "小さいサイズが安かった", purchasedBy: "パパ", purchasedAt: "2026.04.12" },
-    ],
-  },
-  {
-    id: "paper",
-    name: "トイレットペーパー",
-    category: "日用品",
-    icon: "SoapDispenserDroplet",
-    status: "out",
-    note: "ダブル。芯なしでもOK。",
-    lastPurchaseMemo: "12ロール / ダブル",
-    updatedBy: "パパ",
-    updatedAt: "2026.05.30 18:42",
-    purchaseLogs: [
-      { id: "p3", volume: "12ロール", memo: "ダブル", purchasedBy: "パパ", purchasedAt: "2026.05.10" },
-    ],
-  },
-  {
-    id: "salt",
-    name: "伯方の塩",
-    category: "調味料",
-    icon: "CookingPot",
-    status: "in_stock",
-    note: "詰め替え用を優先。",
-    lastPurchaseMemo: "1kg / 詰め替え",
-    updatedBy: "ママ",
-    updatedAt: "2026.05.29 20:01",
-    purchaseLogs: [],
-  },
-  {
-    id: "sponge",
-    name: "食器用スポンジ",
-    category: "日用品",
-    icon: "BrushCleaning",
-    status: "in_stock",
-    note: "3個入りの硬め。",
-    updatedBy: "ママ",
-    updatedAt: "2026.05.22 08:10",
-    purchaseLogs: [],
-  },
-  {
-    id: "tea",
-    name: "某メーカー麦茶",
-    category: "飲料品",
-    icon: "Milk",
-    status: "discontinued",
-    note: "補充しないもの。通常一覧では控えめ表示。",
-    updatedBy: "パパ",
-    updatedAt: "2026.05.20 12:12",
-    purchaseLogs: [],
-  },
-];
-
-const sampleLogs: ActivityLog[] = [
-  {
-    id: "l1",
-    itemName: "トイレットペーパー",
-    from: "low",
-    to: "out",
-    changedBy: "パパ",
-    changedAt: "2026.05.30 18:42",
-    notified: true,
-    message: "LINE通知済み",
-  },
-  {
-    id: "l2",
-    itemName: "しょうゆ",
-    from: "in_stock",
-    to: "low",
-    changedBy: "ママ",
-    changedAt: "2026.05.30 09:15",
-    notified: true,
-    message: "LINE通知済み",
-  },
-];
 
 const initialItems: StockItem[] = [];
 const initialLogs: ActivityLog[] = [];
@@ -669,7 +586,7 @@ export default function Home() {
       supabase.from("profiles").select("id, display_name, email, avatar_url").eq("household_id", householdRow.id),
       supabase
         .from("items")
-        .select("id, name, category, icon, status, note, last_purchase_memo, updated_by, updated_at")
+        .select("id, name, category, icon, status, note, last_purchase_memo, updated_by, updated_at, created_at")
         .order("updated_at", { ascending: false }),
     ]);
 
@@ -731,6 +648,9 @@ export default function Home() {
       updatedBy: item.updated_by ? members[item.updated_by]?.displayName || "家族" : "家族",
       updatedByAvatarUrl: item.updated_by ? members[item.updated_by]?.avatarUrl || "" : "",
       updatedAt: formatDateTime(item.updated_at),
+      updatedAtRaw: item.updated_at,
+      createdAt: formatDate(item.created_at),
+      createdAtRaw: item.created_at,
       purchaseLogs: purchases
         .filter((purchase) => purchase.item_id === item.id)
         .map((purchase) => ({
@@ -738,7 +658,9 @@ export default function Home() {
           volume: purchase.volume ?? "",
           memo: purchase.memo ?? "",
           purchasedBy: purchase.purchased_by ? members[purchase.purchased_by]?.displayName || "家族" : "家族",
+          purchasedByAvatarUrl: purchase.purchased_by ? members[purchase.purchased_by]?.avatarUrl || "" : "",
           purchasedAt: formatDate(purchase.purchased_at),
+          purchasedAtRaw: purchase.purchased_at,
         })),
     }));
 
@@ -1101,13 +1023,6 @@ export default function Home() {
     setToast("");
   }
 
-  function loadSampleData() {
-    setItems(sampleItems);
-    setLogs(sampleLogs);
-    setSelectedId(sampleItems[0]?.id ?? "");
-    setToast("");
-  }
-
   function startEdit(item: StockItem) {
     setSelectedId(item.id);
     setEditForm({ name: item.name, category: item.category, note: item.note });
@@ -1130,7 +1045,6 @@ export default function Home() {
         name: editForm.name.trim(),
         category: editForm.category,
         icon: getCategoryIcon(editForm.category, categoryIcons),
-        note: editForm.note,
         updated_by: authUser.id,
         updated_at: new Date().toISOString(),
       })
@@ -1143,6 +1057,45 @@ export default function Home() {
 
     await loadHouseholdData(authUser);
     setScreen("detail");
+    setToast("");
+  }
+
+  async function saveItemNote(itemId: string, note: string) {
+    if (!supabase || !authUser) return;
+    const { error } = await supabase
+      .from("items")
+      .update({
+        note: note.trim() || null,
+        updated_by: authUser.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", itemId);
+
+    if (error) {
+      setToast(`メモの更新に失敗しました: ${error.message}`);
+      return;
+    }
+
+    await loadHouseholdData(authUser);
+    setToast("");
+  }
+
+  async function savePurchaseLog(logId: string, volume: string, memo: string) {
+    if (!supabase || !authUser) return;
+    const { error } = await supabase
+      .from("purchase_logs")
+      .update({
+        volume: volume.trim() || null,
+        memo: memo.trim() || null,
+      })
+      .eq("id", logId);
+
+    if (error) {
+      setToast(`補充メモの更新に失敗しました: ${error.message}`);
+      return;
+    }
+
+    await loadHouseholdData(authUser);
     setToast("");
   }
 
@@ -1485,7 +1438,6 @@ export default function Home() {
               }}
               onStatus={requestStatusChange}
               onBatchNotify={() => setBatchNotifyConfirmOpen(true)}
-              onLoadSample={loadSampleData}
             />
           )}
           {effectiveScreen === "add" && <AddItemView form={form} setForm={setForm} categoryIcons={categoryIcons} onSubmit={addItem} onCancel={() => setScreen("stock")} />}
@@ -1497,6 +1449,8 @@ export default function Home() {
               onDelete={() => setDeleteTarget(selectedItem)}
               onStatus={requestStatusChange}
               onRestock={() => setRestockId(selectedItem.id)}
+              onSaveItemNote={saveItemNote}
+              onSavePurchaseLog={savePurchaseLog}
             />
           ) : null}
           {effectiveScreen === "edit" && selectedItem ? (
@@ -1774,7 +1728,6 @@ function StockView(props: {
   onDetail: (id: string) => void;
   onStatus: (id: string, status: ItemStatus) => void;
   onBatchNotify: () => void;
-  onLoadSample: () => void;
 }) {
   return (
     <div className="pb-20 md:pb-6">
@@ -1820,7 +1773,6 @@ function StockView(props: {
           <p className="meta mt-2 leading-6">初回利用時は空の在庫一覧から始まります。管理したい日用品や調味料を追加してください。</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <button onClick={props.onAdd} className="btn-primary px-5 py-2.5">➕ アイテムを追加</button>
-            <button onClick={props.onLoadSample} className="min-h-12 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">サンプルでデザイン確認</button>
           </div>
         </div>
       ) : null}
@@ -1909,6 +1861,8 @@ function DetailView({
   onDelete,
   onStatus,
   onRestock,
+  onSaveItemNote,
+  onSavePurchaseLog,
 }: {
   item: StockItem;
   onBack: () => void;
@@ -1916,17 +1870,58 @@ function DetailView({
   onDelete: () => void;
   onStatus: (id: string, status: ItemStatus) => void;
   onRestock: () => void;
+  onSaveItemNote: (itemId: string, note: string) => void | Promise<void>;
+  onSavePurchaseLog: (logId: string, volume: string, memo: string) => void | Promise<void>;
 }) {
+  const memoEntries = [
+    ...(item.note.trim()
+      ? [
+          {
+            id: `item-${item.id}`,
+            type: "item" as const,
+            title: item.note.trim(),
+            volume: "",
+            memo: item.note.trim(),
+            date: item.createdAt,
+            rawDate: item.createdAtRaw,
+            recordedBy: item.updatedBy,
+            recordedByAvatarUrl: item.updatedByAvatarUrl,
+            updatedBy: item.updatedBy,
+            updatedByAvatarUrl: item.updatedByAvatarUrl,
+            updatedAt: formatDate(item.updatedAtRaw),
+            updatedAtRaw: item.updatedAtRaw,
+          },
+        ]
+      : []),
+    ...item.purchaseLogs
+      .filter((log) => log.volume.trim() || log.memo.trim())
+      .map((log) => ({
+        id: log.id,
+        type: "purchase" as const,
+        title: [log.volume, log.memo].filter(Boolean).join(" / "),
+        volume: log.volume,
+        memo: log.memo,
+        date: log.purchasedAt,
+        rawDate: log.purchasedAtRaw,
+        recordedBy: log.purchasedBy,
+        recordedByAvatarUrl: log.purchasedByAvatarUrl,
+        updatedBy: log.purchasedBy,
+        updatedByAvatarUrl: log.purchasedByAvatarUrl,
+        updatedAt: "",
+        updatedAtRaw: "",
+      })),
+  ].sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
+
   return (
     <div className="mx-auto w-full max-w-4xl pb-20 md:pb-6">
-      <button onClick={onBack} className="mb-4 min-h-10 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold"><ArrowLeft className="mr-2 inline size-4" strokeWidth={2.5} aria-hidden="true" />戻る</button>
+      <button onClick={onBack} className="mb-4 inline-flex min-h-10 items-center rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-sm font-extrabold"><ArrowLeft className="mr-2 size-4" strokeWidth={2.5} aria-hidden="true" />戻る</button>
       <div className="grid gap-6 md:grid-cols-[320px_1fr]">
         <section className="card text-center">
           <div className="mx-auto grid size-20 place-items-center rounded-2xl border-2 border-[#2B2A27] bg-[#FFF7EC] text-[#33312E]">
             <AppIcon name={item.icon} className="size-10" />
           </div>
           <h1 className="mt-2 text-xl font-black">{item.name}</h1>
-          <p className="meta mt-1"><span className="tag">{item.category}</span> {item.note}</p>
+          <p className="meta mt-1"><span className="tag">{item.category}</span></p>
           <div className="my-3"><StatusPill status={item.status} /></div>
           <div className="grid grid-cols-4 gap-1.5">
             {(["in_stock", "low", "out", "discontinued"] as ItemStatus[]).map((status) => (
@@ -1943,24 +1938,120 @@ function DetailView({
           </div>
         </section>
         <section>
-          <Overline>MEMO</Overline>
-          <h2 className="heading">メモ</h2>
-          <div className="card mb-3">
-            <div className="flex items-center justify-between gap-3">
-              <b>登録メモ</b>
-              <span className="tag">ITEM</span>
-            </div>
-            <p className="meta mt-2 leading-6">{item.note || "登録メモはまだありません。"}</p>
-          </div>
-          <Overline>PURCHASE LOG</Overline>
-          <h2 className="heading">補充メモ履歴</h2>
-          {item.purchaseLogs.length ? item.purchaseLogs.map((log) => (
-            <div key={log.id} className="card mb-3">
-              <div className="flex justify-between gap-3"><b>{[log.volume, log.memo].filter(Boolean).join(" / ")}</b><span className="meta font-[var(--font-outfit)]">{log.purchasedAt}</span></div>
-              <p className="meta">記録：{log.purchasedBy}</p>
-            </div>
-          )) : <p className="note">補充時のメモはまだありません。「補充した」から容量や今回買ったものを記録できます。</p>}
+          <Overline>MEMO LOG</Overline>
+          <h2 className="heading">メモ履歴</h2>
+          {memoEntries.length ? (
+            memoEntries.map((entry) => (
+              <MemoLogCard
+                key={entry.id}
+                entry={entry}
+                onSave={entry.type === "item" ? (note) => onSaveItemNote(item.id, note) : (volume, memo) => onSavePurchaseLog(entry.id, volume, memo ?? "")}
+              />
+            ))
+          ) : (
+            <p className="note">メモはまだありません。「補充した」から容量や今回買ったものを記録できます。</p>
+          )}
         </section>
+      </div>
+    </div>
+  );
+}
+
+type MemoLogEntry = {
+  id: string;
+  type: "item" | "purchase";
+  title: string;
+  volume: string;
+  memo: string;
+  date: string;
+  rawDate: string;
+  recordedBy: string;
+  recordedByAvatarUrl?: string;
+  updatedBy: string;
+  updatedByAvatarUrl?: string;
+  updatedAt: string;
+  updatedAtRaw?: string;
+};
+
+function MemoLogCard({
+  entry,
+  onSave,
+}: {
+  entry: MemoLogEntry;
+  onSave: (valueOrVolume: string, memo?: string) => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(entry.memo);
+  const [volumeDraft, setVolumeDraft] = useState(entry.volume);
+  const [memoDraft, setMemoDraft] = useState(entry.memo);
+  const [saving, setSaving] = useState(false);
+  const recordedAtTime = new Date(entry.rawDate).getTime();
+  const updatedAtTime = entry.updatedAtRaw ? new Date(entry.updatedAtRaw).getTime() : Number.NaN;
+  const showUpdate =
+    Boolean(entry.updatedAtRaw) &&
+    Number.isFinite(recordedAtTime) &&
+    Number.isFinite(updatedAtTime) &&
+    Math.abs(updatedAtTime - recordedAtTime) > 60_000;
+
+  async function save() {
+    setSaving(true);
+    if (entry.type === "item") {
+      await onSave(noteDraft);
+    } else {
+      await onSave(volumeDraft, memoDraft);
+    }
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <div className="card mb-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="hidden">
+            <span className="tag">{entry.type === "item" ? "登録メモ" : "補充メモ"}</span>
+          </div>
+          {editing ? (
+            <div className="grid gap-2">
+              {entry.type === "purchase" ? (
+                <input className="input" value={volumeDraft} onChange={(event) => setVolumeDraft(event.target.value)} placeholder="容量" />
+              ) : null}
+              <input className="input" value={entry.type === "item" ? noteDraft : memoDraft} onChange={(event) => (entry.type === "item" ? setNoteDraft(event.target.value) : setMemoDraft(event.target.value))} placeholder="メモ" />
+            </div>
+          ) : (
+            <b className="block text-base leading-7">{entry.title}</b>
+          )}
+          <div className="meta mt-3 space-y-1">
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="tag">記録</span>
+              <span className="inline-flex items-center gap-1 font-bold">
+                <Avatar name={entry.recordedBy} avatarUrl={entry.recordedByAvatarUrl} size="xs" />
+                {entry.recordedBy}
+              </span>
+              <span className="font-[var(--font-outfit)]">{entry.date}</span>
+            </p>
+            {showUpdate ? (
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="tag">更新</span>
+              <span className="inline-flex items-center gap-1 font-bold">
+                <Avatar name={entry.updatedBy} avatarUrl={entry.updatedByAvatarUrl} size="xs" />
+                {entry.updatedBy}
+              </span>
+              <span className="font-[var(--font-outfit)]">{entry.updatedAt}</span>
+            </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {editing ? (
+            <>
+              <button type="button" onClick={() => setEditing(false)} className="min-h-9 rounded-full px-3 py-1 text-xs font-extrabold text-[#7A746B]">キャンセル</button>
+              <button type="button" onClick={save} disabled={saving} className="min-h-9 rounded-full border-2 border-[#2B2A27] bg-white px-3 py-1 text-xs font-extrabold disabled:opacity-50">保存</button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setEditing(true)} className="min-h-9 rounded-full border-2 border-[#2B2A27] bg-white px-3 py-1 text-xs font-extrabold">編集</button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1997,9 +2088,6 @@ function EditItemView({
             </CategoryButton>
           ))}
         </div>
-      </Field>
-      <Field label="メモ">
-        <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
       </Field>
       <div className="mt-4 flex flex-wrap gap-3">
         <button type="button" onClick={onCancel} className="min-h-12 rounded-full border-2 border-[#2B2A27] bg-white px-5 py-3 text-sm font-extrabold">キャンセル</button>
@@ -2823,9 +2911,12 @@ function MobileNav({ screen, go }: { screen: Screen; go: (screen: Screen) => voi
   ] as const;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[#E7DCC6] bg-white md:hidden">
-      {nav.map(([id, icon, label]) => (
-        <button key={id} onClick={() => go(id)} className={`py-2 text-center text-[10px] font-extrabold ${screen === id ? "text-[#E0734D]" : "text-[#7A746B]"}`}><AppIcon name={icon} className="mx-auto mb-1 size-5" />{label}</button>
-      ))}
+      {nav.map(([id, icon, label]) => {
+        const active = screen === id || (id === "stock" && (screen === "detail" || screen === "edit"));
+        return (
+          <button key={id} onClick={() => go(id)} className={`py-2 text-center text-[10px] font-extrabold ${active ? "text-[#E0734D]" : "text-[#7A746B]"}`}><AppIcon name={icon} className="mx-auto mb-1 size-5" />{label}</button>
+        );
+      })}
     </nav>
   );
 }
