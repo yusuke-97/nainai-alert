@@ -735,11 +735,17 @@ export default function Home() {
 
   function openNotifications() {
     setNotificationPanelOpen(true);
-    const nextReadIds = Array.from(new Set([...readNotificationIds, ...appNotifications.map((notification) => notification.id)]));
-    setReadNotificationIds(nextReadIds);
-    if (notificationStorageKey) {
-      window.localStorage.setItem(notificationStorageKey, JSON.stringify(nextReadIds));
-    }
+  }
+
+  function markNotificationAsRead(notificationId: string) {
+    setReadNotificationIds((currentReadIds) => {
+      if (currentReadIds.includes(notificationId)) return currentReadIds;
+      const nextReadIds = [...currentReadIds, notificationId];
+      if (notificationStorageKey) {
+        window.localStorage.setItem(notificationStorageKey, JSON.stringify(nextReadIds));
+      }
+      return nextReadIds;
+    });
   }
 
   async function sendBatchNotification() {
@@ -1363,7 +1369,12 @@ export default function Home() {
         {toast ? <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full border-2 border-[#2B2A27] bg-white px-4 py-2 text-center text-xs font-bold shadow-[0_10px_30px_rgba(80,60,30,.16)] md:bottom-6">{toast}</div> : null}
         {restockItem ? <RestockModal item={restockItem} onSubmit={restock} onClose={() => setRestockId(null)} /> : null}
         {notificationPanelOpen ? (
-          <NotificationPanel notifications={appNotifications} onClose={() => setNotificationPanelOpen(false)} />
+          <NotificationPanel
+            notifications={appNotifications}
+            readNotificationIds={readNotificationIds}
+            onRead={markNotificationAsRead}
+            onClose={() => setNotificationPanelOpen(false)}
+          />
         ) : null}
         {batchNotifyConfirmOpen ? (
           <BatchNotifyConfirmModal count={batchNotifyCount} onConfirm={sendBatchNotification} onClose={() => setBatchNotifyConfirmOpen(false)} />
@@ -2477,7 +2488,17 @@ function BatchNotifyConfirmModal({ count, onConfirm, onClose }: { count: number;
   );
 }
 
-function NotificationPanel({ notifications, onClose }: { notifications: AppNotification[]; onClose: () => void }) {
+function NotificationPanel({
+  notifications,
+  readNotificationIds,
+  onRead,
+  onClose,
+}: {
+  notifications: AppNotification[];
+  readNotificationIds: string[];
+  onRead: (notificationId: string) => void;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-40 bg-[#2B2A27]/35 px-4 py-5">
       <section className="ml-auto flex h-full w-full max-w-md flex-col rounded-[22px] border-2 border-[#2B2A27] bg-white p-5 shadow-[0_10px_30px_rgba(80,60,30,.20)]">
@@ -2491,16 +2512,31 @@ function NotificationPanel({ notifications, onClose }: { notifications: AppNotif
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {notifications.length ? (
-            notifications.map((notification) => (
-              <div key={notification.id} className="rounded-[14px] border-2 border-[#E7DCC6] bg-[#FFFBF4] p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <StatusPill status={notification.status} small />
-                  <span className="meta font-[var(--font-outfit)]">{notification.changedAt}</span>
-                </div>
-                <p className="text-sm font-extrabold leading-6">{notification.itemName}</p>
-                <p className="meta mt-1">{notification.message} ・ {notification.changedBy}</p>
-              </div>
-            ))
+            notifications.map((notification) => {
+              const isRead = readNotificationIds.includes(notification.id);
+              return (
+                <button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => onRead(notification.id)}
+                  className={`block w-full rounded-[14px] border-2 p-3 text-left transition ${
+                    isRead ? "border-[#E7DCC6] bg-white opacity-70" : "border-[#E0734D] bg-[#FFFBF4]"
+                  }`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <StatusPill status={notification.status} small />
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${isRead ? "bg-[#F1EEE7] text-[#7A746B]" : "bg-[#E4564A] text-white"}`}>
+                        {isRead ? "既読" : "未読"}
+                      </span>
+                      <span className="meta font-[var(--font-outfit)]">{notification.changedAt}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm font-extrabold leading-6">{notification.itemName}</p>
+                  <p className="meta mt-1">{notification.message} ・ {notification.changedBy}</p>
+                </button>
+              );
+            })
           ) : (
             <p className="note">お知らせはまだありません。ステータスが「わずか」または「切れ」になるとここに表示されます。</p>
           )}
